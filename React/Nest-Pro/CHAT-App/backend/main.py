@@ -23,6 +23,9 @@ from routes.files import router as files_router
 from routes.ai import router as ai_router
 from routes.rooms import router as rooms_router
 from routes.settings import router as settings_router, block_router
+from routes.archive import router as archive_router
+from routes.calls import router as calls_router
+from routes.status import router as status_router
 
 # Get absolute path to frontend directory
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
@@ -63,6 +66,9 @@ app.include_router(ai_router)
 app.include_router(rooms_router)
 app.include_router(settings_router)
 app.include_router(block_router)
+app.include_router(archive_router)
+app.include_router(calls_router)
+app.include_router(status_router)
 
 # Get absolute path to frontend directory - more robust
 import pathlib
@@ -104,6 +110,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
     
     # Connect
     await manager.connect(websocket, user_id)
+    
+    # Send list of online users to the newly connected client
+    online_users = manager.get_online_users()
+    await websocket.send_json({
+        "type": "online_users",
+        "users": online_users
+    })
     
     try:
         while True:

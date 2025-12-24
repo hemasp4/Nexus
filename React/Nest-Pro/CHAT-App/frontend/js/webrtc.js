@@ -231,6 +231,7 @@ async function handleCallOffer(data) {
     currentCallId = data.call_id;
     currentCallType = data.call_type;
     callState = 'incoming';
+    window.isIncomingCall = true;  // Track that this is an incoming call
 
     // Store the offer for when we accept
     window.pendingOffer = data;
@@ -292,14 +293,14 @@ async function acceptCall() {
 function rejectCall() {
     clearTimeout(callTimeout);
     sendWsMessage({ type: 'call_rejected', call_id: currentCallId });
-    cleanupCall();
+    cleanupCall('rejected');
 }
 
 // Cancel outgoing call
 function cancelCall() {
     clearTimeout(callTimeout);
     sendWsMessage({ type: 'call_cancelled', call_id: currentCallId });
-    cleanupCall();
+    cleanupCall('cancelled');
 }
 
 // Handle call answer
@@ -470,9 +471,23 @@ async function flipCamera() {
 }
 
 // Cleanup after call ends
-function cleanupCall() {
+function cleanupCall(status = 'completed') {
     clearTimeout(callTimeout);
     clearInterval(callTimerInterval);
+
+    // Log the call if we have a valid call
+    if (AppState.currentChat && currentCallType) {
+        const finalStatus = callState === 'connected' ? 'completed' :
+            (status === 'cancelled' ? 'cancelled' :
+                (status === 'rejected' ? 'rejected' : 'missed'));
+
+        // Only log outgoing calls (caller logs)
+        if (callState === 'outgoing' || (callState === 'connected' && !window.isIncomingCall)) {
+            if (typeof logCall === 'function') {
+                logCall(AppState.currentChat, currentCallType, finalStatus, callDuration);
+            }
+        }
+    }
 
     // Stop all streams
     if (localStream) {
@@ -501,6 +516,7 @@ function cleanupCall() {
     isScreenSharing = false;
     callDuration = 0;
     window.pendingOffer = null;
+    window.isIncomingCall = false;
 
     // Hide UI
     document.getElementById('callOverlay')?.classList.add('hidden');

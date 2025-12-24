@@ -153,8 +153,24 @@ function renderContacts() {
         return;
     }
 
-    contactList.innerHTML = AppState.contacts.map(contact => `
-        <div class="contact-item" data-user-id="${contact.id}" onclick="openChat('${contact.id}', 'user')">
+    // Filter out archived contacts (unless in archived view)
+    const archivedChats = window.archiveState?.archivedChats || [];
+    const visibleContacts = AppState.contacts.filter(c => !archivedChats.includes(c.id));
+
+    if (visibleContacts.length === 0) {
+        contactList.innerHTML = `
+            <div class="p-8 text-center text-gray-500">
+                <p>No chats</p>
+                <p class="text-sm mt-2">All chats are archived</p>
+            </div>
+        `;
+        return;
+    }
+
+    contactList.innerHTML = visibleContacts.map(contact => `
+        <div class="contact-item" data-user-id="${contact.id}" 
+             onclick="openChat('${contact.id}', 'user')"
+             oncontextmenu="showArchiveContextMenu(event, '${contact.id}', false)">
             <div class="contact-avatar">
                 ${contact.avatar
             ? `<img src="${API_URL}/api/files/${contact.avatar}" alt="${contact.username}">`

@@ -114,7 +114,22 @@ class UserInDB(BaseModel):
     about: str = "Hey there! I'm using NexusChat"
     contacts: List[str] = []
     blocked: List[str] = []
+    archived_chats: List[str] = []  # List of archived chat/room IDs
+    archive_pin_hash: Optional[str] = None  # Hashed 4-digit PIN for archive access
     settings: UserSettings = Field(default_factory=UserSettings)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_seen: datetime = Field(default_factory=datetime.utcnow)
 
+# Archive Request Models
+class ArchivePinSet(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=4, pattern=r"^\d{4}$")
+
+class ArchivePinVerify(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=4)
+
+class ForgotPinRequest(BaseModel):
+    email: str
+
+class ResetPinRequest(BaseModel):
+    otp: str = Field(..., min_length=6, max_length=6)
+    new_pin: str = Field(..., min_length=4, max_length=4, pattern=r"^\d{4}$")

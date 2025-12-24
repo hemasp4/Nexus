@@ -92,6 +92,26 @@ function handleWsMessage(data) {
             handleUserStatus(data);
             break;
 
+        case 'online_users':
+            // Populate online users set on connection
+            if (data.users && Array.isArray(data.users)) {
+                AppState.onlineUsers = new Set(data.users);
+                console.log('Online users:', data.users);
+                // Refresh contacts to show correct online status
+                if (typeof loadContacts === 'function') {
+                    loadContacts();
+                }
+                // Update current chat header if open
+                if (AppState.currentChat) {
+                    const statusEl = document.getElementById('chatStatus');
+                    if (statusEl && AppState.onlineUsers.has(AppState.currentChat)) {
+                        statusEl.textContent = 'Online';
+                        statusEl.className = 'status text-green-400';
+                    }
+                }
+            }
+            break;
+
         case 'call_offer':
             handleCallOffer(data);
             break;

@@ -25,6 +25,10 @@ function initChatUI() {
     messageInput?.addEventListener('keydown', handleKeyDown);
     sendBtn?.addEventListener('click', handleSend);
 
+    // Clipboard paste handler for images/files
+    document.addEventListener('paste', handlePaste);
+    messageInput?.addEventListener('paste', handlePaste);
+
     // Attachment menu toggle
     document.getElementById('attachBtn')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -47,6 +51,152 @@ function initChatUI() {
     // Call buttons
     document.getElementById('voiceCallBtn')?.addEventListener('click', () => startCall('audio'));
     document.getElementById('videoCallBtn')?.addEventListener('click', () => startCall('video'));
+}
+
+// Handle clipboard paste for images and files
+async function handlePaste(e) {
+    // Only handle if we have an active chat
+    if (!AppState.currentChat) return;
+
+    const clipboardData = e.clipboardData || window.clipboardData;
+    if (!clipboardData) return;
+
+    const items = clipboardData.items;
+    if (!items) return;
+
+    for (const item of items) {
+        // Handle images
+        if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (file) {
+                await handlePastedFile(file);
+            }
+            return;
+        }
+
+        // Handle files
+        if (item.kind === 'file') {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (file) {
+                await handlePastedFile(file);
+            }
+            return;
+        }
+    }
+}
+
+// Handle pasted file - show preview and allow sending
+async function handlePastedFile(file) {
+    // Create preview modal
+    const modal = document.createElement('div');
+    modal.className = 'pin-modal';
+    modal.id = 'pastePreviewModal';
+
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    let previewContent = '';
+    if (isImage) {
+        const url = URL.createObjectURL(file);
+        previewContent = `<img src="${url}" alt="Pasted image" class="pasted-preview-image">`;
+    } else if (isVideo) {
+        const url = URL.createObjectURL(file);
+        previewContent = `<video src="${url}" controls class="pasted-preview-video"></video>`;
+    } else {
+        previewContent = `
+            <div class="pasted-file-preview">
+                <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <p class="text-white mt-2">${file.name}</p>
+                <p class="text-gray-400 text-sm">${formatFileSize(file.size)}</p>
+            </div>
+        `;
+    }
+
+    modal.innerHTML = `
+        <div class="pin-modal-content" style="max-width: 500px;">
+            <h3 class="pin-modal-title">Send ${isImage ? 'Image' : isVideo ? 'Video' : 'File'}</h3>
+            <div class="paste-preview-container">
+                ${previewContent}
+            </div>
+            <div class="flex gap-3 mt-4">
+                <button class="btn-secondary flex-1 py-2 rounded-lg" onclick="closePastePreview()">Cancel</button>
+                <button class="btn-primary flex-1 py-2 rounded-lg" onclick="sendPastedFile()">Send</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Store file for sending
+    window.pendingPastedFile = file;
+}
+
+// Close paste preview modal
+function closePastePreview() {
+    document.getElementById('pastePreviewModal')?.remove();
+    window.pendingPastedFile = null;
+}
+
+// Send the pasted file
+async function sendPastedFile() {
+    const file = window.pendingPastedFile;
+    if (!file || !AppState.currentChat) {
+        closePastePreview();
+        return;
+    }
+
+    closePastePreview();
+
+    try {
+        // Upload file
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const uploadResponse = await fetch(`${API_URL}/api/files/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${AppState.token}`
+            },
+            body: formData
+        });
+
+        if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+
+            // Send message with file
+            const messageData = {
+                type: 'chat',
+                receiver_id: AppState.currentChat,
+                chat_type: AppState.currentChatType || 'direct',
+                message: '',
+                file_id: uploadData.file_id,
+                file_name: file.name,
+                file_type: file.type,
+                file_size: file.size
+            };
+
+            sendWsMessage(messageData);
+            showToast('File sent!', 'success');
+        } else {
+            showToast('Failed to upload file', 'error');
+        }
+    } catch (error) {
+        console.error('Error sending pasted file:', error);
+        showToast('Failed to send file', 'error');
+    }
+}
+
+// Format file size helper
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 // Open chat
@@ -869,3 +1019,5 @@ window.copyMessage = copyMessage;
 window.copyMessageContent = copyMessageContent;
 window.downloadFile = downloadFile;
 window.deleteMessage = deleteMessage;
+window.closePastePreview = closePastePreview;
+window.sendPastedFile = sendPastedFile;
