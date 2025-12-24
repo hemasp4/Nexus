@@ -33,6 +33,7 @@ function initWebSocket() {
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                console.log('📨 WS Received:', data.type, data);
                 handleWsMessage(data);
             } catch (error) {
                 console.error('Failed to parse WebSocket message:', error);
@@ -65,9 +66,10 @@ function initWebSocket() {
 // Send WebSocket message
 function sendWsMessage(data) {
     if (socket && socket.readyState === WebSocket.OPEN) {
+        console.log('📤 WS Sending:', data.type, data);
         socket.send(JSON.stringify(data));
     } else {
-        console.warn('WebSocket not connected');
+        console.warn('WebSocket not connected, state:', socket?.readyState);
     }
 }
 

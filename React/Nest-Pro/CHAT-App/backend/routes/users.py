@@ -112,18 +112,28 @@ async def update_profile(
 
 @router.post("/contacts/{contact_id}")
 async def add_contact(contact_id: str, current_user: dict = Depends(get_current_user)):
-    """Add a contact"""
+    """Add a contact (mutual add)"""
     db = get_db()
+    
+    # Can't add yourself
+    if contact_id == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="Cannot add yourself as contact")
     
     # Check if contact exists
     contact = await db.users.find_one({"_id": ObjectId(contact_id)})
     if not contact:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Add to contacts list
+    # Add to current user's contacts list
     await db.users.update_one(
         {"_id": ObjectId(current_user["user_id"])},
         {"$addToSet": {"contacts": contact_id}}
+    )
+    
+    # Also add current user to contact's contacts list (mutual add)
+    await db.users.update_one(
+        {"_id": ObjectId(contact_id)},
+        {"$addToSet": {"contacts": current_user["user_id"]}}
     )
     
     return {"message": "Contact added successfully"}

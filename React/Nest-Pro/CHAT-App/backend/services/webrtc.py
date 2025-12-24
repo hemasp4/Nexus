@@ -122,12 +122,13 @@ call_manager = CallManager()
 
 
 # WebRTC signaling helpers
-def create_offer_message(call_id: str, caller_id: str, sdp: str, call_type: str) -> dict:
+def create_offer_message(call_id: str, caller_id: str, caller_name: str, sdp: str, call_type: str) -> dict:
     """Create WebRTC offer message"""
     return {
         "type": "call_offer",
         "call_id": call_id,
         "caller_id": caller_id,
+        "caller_name": caller_name,
         "sdp": sdp,
         "call_type": call_type,
         "timestamp": datetime.utcnow().isoformat()

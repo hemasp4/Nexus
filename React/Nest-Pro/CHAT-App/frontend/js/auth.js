@@ -198,5 +198,11 @@ function checkAuth() {
 // Initialize: ensure login tab is shown by default
 switchTab('login');
 
-// Check auth on page load
-checkAuth();
+// TESTING MODE: Clear stored credentials to force fresh login
+// Remove these lines when done testing
+localStorage.removeItem('token');
+localStorage.removeItem('user');
+
+// Check auth on page load - DISABLED for testing multiple users
+// Uncomment to auto-redirect logged-in users to chat
+// checkAuth();

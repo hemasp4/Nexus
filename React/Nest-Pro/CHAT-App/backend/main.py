@@ -127,7 +127,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
             
             elif msg_type == "call_offer":
                 # Handle call offer
-                await handle_call_offer(user_id, message_data)
+                await handle_call_offer(user_id, username, message_data)
             
             elif msg_type == "call_answer":
                 # Handle call answer
@@ -165,6 +165,9 @@ async def handle_chat_message(sender_id: str, sender_username: str, data: dict):
     """Handle incoming chat message"""
     db = get_db()
     
+    print(f"📨 Message from {sender_username} ({sender_id})")
+    print(f"   To receiver: {data.get('receiver_id')}, Room: {data.get('room_id')}")
+    
     # Get sender info for avatar
     sender = await db.users.find_one({"_id": ObjectId(sender_id)})
     
@@ -187,6 +190,7 @@ async def handle_chat_message(sender_id: str, sender_username: str, data: dict):
     }
     
     result = await db.messages.insert_one(message_doc)
+    print(f"   Message saved with ID: {result.inserted_id}")
     
     # Build response message
     response = {
@@ -207,12 +211,18 @@ async def handle_chat_message(sender_id: str, sender_username: str, data: dict):
     }
     
     if data.get("receiver_id"):
-        # Direct message
-        await manager.send_personal(data["receiver_id"], response)
-        await manager.send_personal(sender_id, response)  # Echo back
+        # Direct message - send to receiver and echo back to sender
+        receiver_id = data["receiver_id"]
+        print(f"   Sending to receiver: {receiver_id}")
+        print(f"   Online users: {list(manager.active_connections.keys())}")
+        
+        await manager.send_personal(receiver_id, response)
+        await manager.send_personal(sender_id, response)  # Echo back to sender
+        print(f"   ✅ Message sent to both parties")
     elif data.get("room_id"):
         # Room message
         await manager.broadcast_to_room(data["room_id"], response)
+        print(f"   ✅ Message broadcast to room {data['room_id']}")
 
 
 async def handle_typing(user_id: str, username: str, data: dict):
@@ -252,17 +262,19 @@ async def handle_read_receipt(user_id: str, data: dict):
             })
 
 
-async def handle_call_offer(caller_id: str, data: dict):
+async def handle_call_offer(caller_id: str, caller_username: str, data: dict):
     """Handle WebRTC call offer"""
+    db = get_db()
     callee_id = data.get("callee_id")
     room_id = data.get("room_id")
     sdp = data.get("sdp")
     call_type = data.get("call_type", "audio")
     
-    call_id = str(uuid.uuid4())
+    # Use provided call_id or generate one
+    call_id = data.get("call_id") or str(uuid.uuid4())
     call_manager.create_call(call_id, caller_id, callee_id, room_id, call_type)
     
-    offer_message = create_offer_message(call_id, caller_id, sdp, call_type)
+    offer_message = create_offer_message(call_id, caller_id, caller_username, sdp, call_type)
     
     if callee_id:
         await manager.send_personal(callee_id, offer_message)
