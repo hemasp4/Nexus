@@ -724,8 +724,6 @@ async function copyMessageContent(messageId) {
     // If it's a file/image message, copy the file
     if (message.file_id && (message.message_type === 'image' || message.message_type === 'video' || message.message_type === 'file')) {
         try {
-            showToast('Copying...', 'info');
-
             const response = await fetch(`${API_URL}/api/files/${message.file_id}`, {
                 headers: {
                     'Authorization': `Bearer ${AppState.token}`
