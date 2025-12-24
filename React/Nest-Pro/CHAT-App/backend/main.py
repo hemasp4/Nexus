@@ -1,0 +1,335 @@
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
+from contextlib import asynccontextmanager
+import json
+import uuid
+import os
+from datetime import datetime
+from bson import ObjectId
+
+from config import settings
+from utils.db import connect_db, disconnect_db, get_db
+from utils.auth import decode_token
+from services.websocket import manager
+from services.webrtc import call_manager, create_offer_message, create_answer_message, create_ice_candidate_message, create_call_ended_message
+
+# Import routes
+from routes.auth import router as auth_router
+from routes.users import router as users_router
+from routes.messages import router as messages_router
+from routes.files import router as files_router
+from routes.ai import router as ai_router
+from routes.rooms import router as rooms_router
+from routes.settings import router as settings_router, block_router
+
+# Get absolute path to frontend directory
+FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown events"""
+    try:
+        await connect_db()
+    except Exception as e:
+        print(f"⚠️ Warning: Could not connect to MongoDB: {e}")
+        print("⚠️ Some features requiring database may not work")
+    yield
+    await disconnect_db()
+
+app = FastAPI(
+    title="NexusChat API",
+    description="Real-time chat application with AI assistant",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(messages_router)
+app.include_router(files_router)
+app.include_router(ai_router)
+app.include_router(rooms_router)
+app.include_router(settings_router)
+app.include_router(block_router)
+
+# Get absolute path to frontend directory - more robust
+import pathlib
+BACKEND_DIR = pathlib.Path(__file__).parent.resolve()
+FRONTEND_DIR = BACKEND_DIR.parent / "frontend"
+print(f"📂 Frontend directory: {FRONTEND_DIR}")
+print(f"📂 CSS directory exists: {(FRONTEND_DIR / 'css').exists()}")
+print(f"📂 JS directory exists: {(FRONTEND_DIR / 'js').exists()}")
+
+# Mount static files (frontend) - CSS and JS
+app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
+app.mount("/js", StaticFiles(directory=str(FRONTEND_DIR / "js")), name="js")
+
+
+@app.get("/")
+async def root():
+    """Serve login page"""
+    return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+
+@app.get("/chat")
+async def chat_page():
+    """Serve chat page"""
+    return FileResponse(str(FRONTEND_DIR / "chat.html"))
+
+
+@app.websocket("/ws/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    """WebSocket endpoint for real-time messaging"""
+    
+    # Authenticate
+    try:
+        payload = decode_token(token)
+        user_id = payload.get("sub")
+        username = payload.get("username")
+    except Exception:
+        await websocket.close(code=4001)
+        return
+    
+    # Connect
+    await manager.connect(websocket, user_id)
+    
+    try:
+        while True:
+            # Receive message
+            data = await websocket.receive_text()
+            message_data = json.loads(data)
+            
+            msg_type = message_data.get("type")
+            
+            if msg_type == "message":
+                # Handle chat message
+                await handle_chat_message(user_id, username, message_data)
+            
+            elif msg_type == "typing":
+                # Handle typing indicator
+                await handle_typing(user_id, username, message_data)
+            
+            elif msg_type == "read":
+                # Handle read receipt
+                await handle_read_receipt(user_id, message_data)
+            
+            elif msg_type == "call_offer":
+                # Handle call offer
+                await handle_call_offer(user_id, message_data)
+            
+            elif msg_type == "call_answer":
+                # Handle call answer
+                await handle_call_answer(user_id, message_data)
+            
+            elif msg_type == "ice_candidate":
+                # Handle ICE candidate
+                await handle_ice_candidate(user_id, message_data)
+            
+            elif msg_type == "call_end":
+                # Handle call end
+                await handle_call_end(user_id, message_data)
+            
+            elif msg_type == "join_room":
+                # Handle room join
+                room_id = message_data.get("room_id")
+                manager.join_room(room_id, user_id)
+            
+            elif msg_type == "leave_room":
+                # Handle room leave
+                room_id = message_data.get("room_id")
+                manager.leave_room(room_id, user_id)
+    
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket, user_id)
+        # Update user status in DB
+        db = get_db()
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"status": "offline", "last_seen": datetime.utcnow()}}
+        )
+
+
+async def handle_chat_message(sender_id: str, sender_username: str, data: dict):
+    """Handle incoming chat message"""
+    db = get_db()
+    
+    # Get sender info for avatar
+    sender = await db.users.find_one({"_id": ObjectId(sender_id)})
+    
+    # Save message to DB
+    message_doc = {
+        "sender_id": sender_id,
+        "receiver_id": data.get("receiver_id"),
+        "room_id": data.get("room_id"),
+        "content": data.get("content", ""),
+        "message_type": data.get("message_type", "text"),
+        "file_id": data.get("file_id"),
+        "file_name": data.get("file_name"),
+        "file_size": data.get("file_size"),
+        "reply_to": data.get("reply_to"),
+        "read_by": [],
+        "delivered_to": [],
+        "timestamp": datetime.utcnow(),
+        "edited": False,
+        "deleted": False
+    }
+    
+    result = await db.messages.insert_one(message_doc)
+    
+    # Build response message
+    response = {
+        "type": "message",
+        "id": str(result.inserted_id),
+        "sender_id": sender_id,
+        "sender_username": sender_username,
+        "sender_avatar": sender.get("avatar") if sender else None,
+        "receiver_id": data.get("receiver_id"),
+        "room_id": data.get("room_id"),
+        "content": data.get("content", ""),
+        "message_type": data.get("message_type", "text"),
+        "file_id": data.get("file_id"),
+        "file_name": data.get("file_name"),
+        "file_size": data.get("file_size"),
+        "reply_to": data.get("reply_to"),
+        "timestamp": message_doc["timestamp"].isoformat()
+    }
+    
+    if data.get("receiver_id"):
+        # Direct message
+        await manager.send_personal(data["receiver_id"], response)
+        await manager.send_personal(sender_id, response)  # Echo back
+    elif data.get("room_id"):
+        # Room message
+        await manager.broadcast_to_room(data["room_id"], response)
+
+
+async def handle_typing(user_id: str, username: str, data: dict):
+    """Handle typing indicator"""
+    message = {
+        "type": "typing",
+        "user_id": user_id,
+        "username": username,
+        "is_typing": data.get("is_typing", True)
+    }
+    
+    if data.get("receiver_id"):
+        await manager.send_personal(data["receiver_id"], message)
+    elif data.get("room_id"):
+        await manager.broadcast_to_room(data["room_id"], message, exclude_user=user_id)
+
+
+async def handle_read_receipt(user_id: str, data: dict):
+    """Handle message read receipt"""
+    db = get_db()
+    message_id = data.get("message_id")
+    
+    if message_id:
+        # Update message read status
+        await db.messages.update_one(
+            {"_id": ObjectId(message_id)},
+            {"$addToSet": {"read_by": user_id}}
+        )
+        
+        # Notify sender
+        message = await db.messages.find_one({"_id": ObjectId(message_id)})
+        if message:
+            await manager.send_personal(message["sender_id"], {
+                "type": "read_receipt",
+                "message_id": message_id,
+                "read_by": user_id
+            })
+
+
+async def handle_call_offer(caller_id: str, data: dict):
+    """Handle WebRTC call offer"""
+    callee_id = data.get("callee_id")
+    room_id = data.get("room_id")
+    sdp = data.get("sdp")
+    call_type = data.get("call_type", "audio")
+    
+    call_id = str(uuid.uuid4())
+    call_manager.create_call(call_id, caller_id, callee_id, room_id, call_type)
+    
+    offer_message = create_offer_message(call_id, caller_id, sdp, call_type)
+    
+    if callee_id:
+        await manager.send_personal(callee_id, offer_message)
+    elif room_id:
+        await manager.broadcast_to_room(room_id, offer_message, exclude_user=caller_id)
+
+
+async def handle_call_answer(answerer_id: str, data: dict):
+    """Handle WebRTC call answer"""
+    call_id = data.get("call_id")
+    sdp = data.get("sdp")
+    
+    call_manager.join_call(call_id, answerer_id)
+    
+    call = call_manager.get_call(call_id)
+    if call:
+        answer_message = create_answer_message(call_id, answerer_id, sdp)
+        
+        # Send to caller or all participants
+        if call.get("callee_id"):
+            await manager.send_personal(call["caller_id"], answer_message)
+        else:
+            for participant in call["participants"]:
+                if participant != answerer_id:
+                    await manager.send_personal(participant, answer_message)
+
+
+async def handle_ice_candidate(user_id: str, data: dict):
+    """Handle WebRTC ICE candidate"""
+    call_id = data.get("call_id")
+    candidate = data.get("candidate")
+    
+    call = call_manager.get_call(call_id)
+    if call:
+        ice_message = create_ice_candidate_message(call_id, user_id, candidate)
+        
+        for participant in call["participants"]:
+            if participant != user_id:
+                await manager.send_personal(participant, ice_message)
+
+
+async def handle_call_end(user_id: str, data: dict):
+    """Handle call end"""
+    call_id = data.get("call_id")
+    
+    call = call_manager.get_call(call_id)
+    if call:
+        end_message = create_call_ended_message(call_id, user_id)
+        
+        for participant in list(call["participants"]):
+            if participant != user_id:
+                await manager.send_personal(participant, end_message)
+        
+        call_manager.end_call(call_id)
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "app": settings.APP_NAME}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.DEBUG
+    )
