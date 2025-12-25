@@ -110,7 +110,20 @@ function handleNavClick(navType, btn) {
             archiveState.currentView = 'chats';
             archiveState.isUnlocked = false;
             saveNavigationState('chats');
-            loadContacts(); // Reload normal contacts
+            // Reset chat area placeholder if no active chat
+            const chatArea = document.getElementById('chatArea');
+            if (chatArea && !AppState.currentChat) {
+                chatArea.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                        <svg class="w-24 h-24 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                        <p class="text-lg">Select a chat to start messaging</p>
+                    </div>
+                `;
+            }
+            // Force reload contacts with fresh event handlers
+            loadContacts();
             break;
         case 'calls':
             archiveState.currentView = 'calls';
@@ -952,7 +965,7 @@ function showNewGroupModal() {
                 </button>
                 <div>
                     <h3 class="text-lg font-semibold text-white">New group</h3>
-                    <p class="text-sm text-gray-400" id="memberCount">0/1025</p>
+                    <p class="text-sm text-gray-400" id="memberCount">0/${AppState.contacts?.length || 0}</p>
                 </div>
             </div>
             
@@ -1042,7 +1055,7 @@ function updateSelectedMembersUI() {
     }
 
     if (countEl) {
-        countEl.textContent = `${selectedGroupMembers.length}/1025`;
+        countEl.textContent = `${selectedGroupMembers.length}/${AppState.contacts?.length || 0}`;
     }
 
     if (nextBtn) {
@@ -1172,6 +1185,29 @@ async function createGroup() {
 function closeNewGroupModal() {
     document.getElementById('newGroupModal')?.remove();
     selectedGroupMembers = [];
+    window.selectedGroupIcon = null;
+}
+
+// Select group icon
+function selectGroupIcon() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Create preview URL
+        const url = URL.createObjectURL(file);
+        window.selectedGroupIcon = file;
+
+        // Update the icon placeholder
+        const iconPlaceholder = document.querySelector('.group-icon-placeholder');
+        if (iconPlaceholder) {
+            iconPlaceholder.innerHTML = `<img src="${url}" class="group-icon-preview" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+        }
+    };
+    input.click();
 }
 
 // Show add contact modal - uses existing functionality
@@ -1285,3 +1321,4 @@ window.toggleGroupMember = toggleGroupMember;
 window.showGroupNameStep = showGroupNameStep;
 window.createGroup = createGroup;
 window.closeNewGroupModal = closeNewGroupModal;
+window.selectGroupIcon = selectGroupIcon;

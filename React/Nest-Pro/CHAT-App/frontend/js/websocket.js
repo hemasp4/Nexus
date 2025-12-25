@@ -213,8 +213,11 @@ function handleUserStatus(data) {
 
     // Update chat header if this is current chat
     if (data.user_id === AppState.currentChat) {
-        document.getElementById('chatStatus').textContent = data.status === 'online' ? 'Online' : 'Offline';
-        document.getElementById('chatStatus').className = `status ${data.status === 'online' ? 'text-green-400' : 'text-gray-400'}`;
+        const chatStatusEl = document.getElementById('chatStatus');
+        if (chatStatusEl) {
+            chatStatusEl.textContent = data.status === 'online' ? 'Online' : 'Offline';
+            chatStatusEl.className = `status ${data.status === 'online' ? 'text-green-400' : 'text-gray-400'}`;
+        }
     }
 }
 

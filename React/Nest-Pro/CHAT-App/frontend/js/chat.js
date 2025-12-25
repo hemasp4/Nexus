@@ -204,21 +204,35 @@ async function openChat(id, type = 'user') {
     AppState.currentChat = id;
     AppState.currentChatType = type;
 
+    // Get DOM elements (may be null if not on chat page)
+    const emptyStateEl = document.getElementById('emptyState');
+    const activeChatEl = document.getElementById('activeChat');
+    const msgInput = document.getElementById('messageInput');
+    const msgContainer = document.getElementById('messagesContainer');
+
+    // Only proceed if we have the required elements
+    if (!activeChatEl) {
+        console.warn('Chat elements not found on page');
+        return;
+    }
+
     // Update UI
-    emptyState.classList.add('hidden');
-    activeChat.classList.remove('hidden');
-    activeChat.classList.add('flex');
+    emptyStateEl?.classList.add('hidden');
+    activeChatEl.classList.remove('hidden');
+    activeChatEl.classList.add('flex');
 
     // Hide sidebar on mobile
     if (window.innerWidth < 768) {
-        document.getElementById('sidebar').classList.add('hidden');
+        document.getElementById('sidebar')?.classList.add('hidden');
     }
 
     // Update chat header
     await updateChatHeader(id, type);
 
     // Load messages
-    await loadMessages(id, type);
+    if (msgContainer) {
+        await loadMessages(id, type);
+    }
 
     // Mark contact as active
     document.querySelectorAll('.contact-item').forEach(item => {
@@ -228,7 +242,7 @@ async function openChat(id, type = 'user') {
     document.querySelector(selector)?.classList.add('active');
 
     // Focus input
-    messageInput.focus();
+    msgInput?.focus();
 }
 
 // Update chat header
@@ -237,21 +251,24 @@ async function updateChatHeader(id, type) {
     const nameEl = document.getElementById('chatName');
     const statusEl = document.getElementById('chatStatus');
 
+    // Skip if elements don't exist
+    if (!nameEl || !statusEl) return;
+
     if (type === 'user') {
-        const contact = AppState.contacts.find(c => c.id === id);
+        const contact = AppState.contacts?.find(c => c.id === id);
         if (contact) {
-            avatarEl.textContent = contact.username.charAt(0).toUpperCase();
+            if (avatarEl) avatarEl.textContent = contact.username.charAt(0).toUpperCase();
             nameEl.textContent = contact.username;
-            const isOnline = AppState.onlineUsers.has(id);
+            const isOnline = AppState.onlineUsers?.has(id);
             statusEl.textContent = isOnline ? 'Online' : 'Offline';
             statusEl.className = `status ${isOnline ? 'text-green-400' : 'text-gray-400'}`;
         }
     } else {
-        const room = AppState.rooms.find(r => r.id === id);
+        const room = AppState.rooms?.find(r => r.id === id);
         if (room) {
-            avatarEl.textContent = '👥';
+            if (avatarEl) avatarEl.textContent = '👥';
             nameEl.textContent = room.name;
-            statusEl.textContent = `${room.members.length} members`;
+            statusEl.textContent = `${room.members?.length || 0} members`;
             statusEl.className = 'status text-gray-400';
         }
     }
@@ -283,7 +300,7 @@ async function loadMessages(id, type) {
     }
 }
 
-// Render messages
+// Render messages with date separators
 function renderMessages(messages) {
     if (messages.length === 0) {
         messagesContainer.innerHTML = `
@@ -295,8 +312,52 @@ function renderMessages(messages) {
         return;
     }
 
-    messagesContainer.innerHTML = messages.map(msg => createMessageHTML(msg)).join('');
+    let html = '';
+    let lastDate = null;
+
+    messages.forEach(msg => {
+        // Get date string for this message
+        const msgDate = new Date(msg.created_at);
+        const dateStr = formatDateSeparator(msgDate);
+
+        // Add date separator if different from last date
+        if (dateStr !== lastDate) {
+            html += `
+                <div class="date-separator">
+                    <span>${dateStr}</span>
+                </div>
+            `;
+            lastDate = dateStr;
+        }
+
+        html += createMessageHTML(msg);
+    });
+
+    messagesContainer.innerHTML = html;
     scrollToBottom();
+}
+
+// Format date for separator (Today, Yesterday, or date)
+function formatDateSeparator(date) {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const isToday = date.toDateString() === today.toDateString();
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+
+    if (isToday) {
+        return 'Today';
+    } else if (isYesterday) {
+        return 'Yesterday';
+    } else {
+        // Format as "December 25, 2024"
+        return date.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    }
 }
 
 // Create message HTML

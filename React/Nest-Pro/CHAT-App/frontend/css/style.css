@@ -3645,3 +3645,642 @@ body.font-large .contact-last-message {
     background: var(--accent-secondary);
     transform: scale(1.05);
 }
+
+/* ==========================================
+   Emoji Picker Dropdown
+   ========================================== */
+.emoji-picker-dropdown {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    padding: 16px;
+    z-index: 100;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    max-width: 320px;
+}
+
+.emoji-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.emoji-picker-header button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.emoji-item {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 8px;
+    transition: background 0.2s ease;
+}
+
+.emoji-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.emoji-hint {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* ==========================================
+   Text Input Modal for Editor
+   ========================================== */
+.text-input-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.text-input-modal {
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    padding: 24px;
+    width: 90%;
+    max-width: 400px;
+}
+
+.text-input-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.text-input-header h4 {
+    color: var(--text-primary);
+    font-size: 18px;
+    margin: 0;
+}
+
+.text-input-header button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 20px;
+}
+
+.editor-text-area {
+    width: 100%;
+    height: 100px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 12px;
+    color: var(--text-primary);
+    font-size: 16px;
+    resize: none;
+    outline: none;
+}
+
+.text-options {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.font-select {
+    flex: 1;
+    min-width: 100px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+}
+
+.text-color-picker {
+    display: flex;
+    gap: 6px;
+}
+
+.text-color-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.text-color-btn:hover {
+    transform: scale(1.1);
+}
+
+.text-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+/* ==========================================
+   Draggable Overlays for Media Editor
+   ========================================== */
+.overlays-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.draggable-overlay {
+    position: absolute;
+    pointer-events: auto;
+    cursor: grab;
+    user-select: none;
+    z-index: 10;
+}
+
+.draggable-overlay:active {
+    cursor: grabbing;
+}
+
+.text-overlay {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    white-space: nowrap;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.emoji-overlay {
+    font-size: 48px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Better canvas positioning */
+.editor-canvas-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+}
+
+.editor-canvas {
+    position: relative;
+    cursor: crosshair;
+    touch-action: none;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Crop Options */
+.crop-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.crop-option-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.crop-option-btn:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+/* Date Separator for Chat Messages */
+.date-separator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 16px 0;
+    padding: 8px 0;
+}
+
+.date-separator span {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    padding: 6px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Status Options Dropdown */
+.status-options-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    margin-left: auto;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.status-options-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.status-options-dropdown {
+    position: fixed;
+    background: var(--bg-secondary);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 8px 0;
+    min-width: 180px;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.status-options-dropdown .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.status-options-dropdown .dropdown-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.status-options-dropdown .dropdown-item svg {
+    opacity: 0.7;
+}
+
+.status-item.my-status {
+    display: flex;
+    align-items: center;
+}
+
+/* Status Viewer Controls */
+.status-media-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.status-control-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.status-control-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.status-control-btn.delete {
+    color: #ef4444;
+}
+
+.status-control-btn.delete:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+/* Status Reply Box */
+.status-reply-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    padding: 10px 16px;
+    border-radius: 50px;
+    width: calc(100% - 80px);
+    max-width: 500px;
+    z-index: 10;
+}
+
+.status-emoji-btn {
+    font-size: 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.status-emoji-btn:hover {
+    transform: scale(1.2);
+}
+
+.status-reply-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 14px;
+    outline: none;
+}
+
+.status-reply-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.status-send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.status-send-btn:hover {
+    background: var(--accent-secondary);
+    transform: scale(1.1);
+}
+
+/* Status Emoji Picker */
+.status-emoji-picker {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-secondary);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 12px;
+    z-index: 20;
+}
+
+.status-emoji-picker.hidden {
+    display: none;
+}
+
+.emoji-grid-simple {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+}
+
+.emoji-btn-simple {
+    font-size: 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.emoji-btn-simple:hover {
+    background: var(--bg-tertiary);
+    transform: scale(1.2);
+}
+
+/* Status Progress Bar */
+.status-progress-container {
+    display: flex;
+    gap: 4px;
+    padding: 12px 16px 8px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+}
+
+.status-progress-bar {
+    flex: 1;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+    --progress-duration: 10000ms;
+}
+
+.status-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 100%;
+    background: white;
+    border-radius: 2px;
+}
+
+.status-progress-bar.viewed::after {
+    width: 100%;
+}
+
+.status-progress-bar.active.animating::after {
+    width: 100%;
+    animation: progressFill var(--progress-duration) linear forwards;
+}
+
+@keyframes progressFill {
+    from {
+        width: 0%;
+    }
+
+    to {
+        width: 100%;
+    }
+}
+
+/* Status Viewer Layout */
+.status-viewer {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+}
+
+.status-viewer-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    padding-top: 32px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 15;
+}
+
+.status-content-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.status-media {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.status-text-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.status-text-content p {
+    color: white;
+    font-size: 28px;
+    font-weight: 500;
+    text-align: center;
+    word-wrap: break-word;
+    max-width: 80%;
+}
+
+.status-viewer-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.status-viewer-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.status-viewer-name {
+    color: white;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.status-viewer-time {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+}
+
+.status-close-btn {
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.status-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.status-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.2s ease;
+}
+
+.status-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.status-nav-btn.prev {
+    left: 16px;
+}
+
+.status-nav-btn.next {
+    right: 16px;
+}
+
+.status-views {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 8px 16px;
+    border-radius: 20px;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+}

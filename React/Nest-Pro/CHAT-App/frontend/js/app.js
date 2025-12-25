@@ -92,7 +92,7 @@ function initUI() {
     });
 
     // Menu button
-    document.getElementById('menuBtn').addEventListener('click', showMenu);
+    document.getElementById('menuBtn')?.addEventListener('click', showMenu);
 
     // Close modals on overlay click
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
@@ -426,7 +426,9 @@ function showToast(message, type = 'info') {
 }
 
 // Make functions globally accessible
-window.openChat = openChat;
+window.loadContacts = loadContacts;
+window.renderContacts = renderContacts;
+window.loadRooms = loadRooms;
 window.addContact = addContact;
 window.showCreateGroupModal = showCreateGroupModal;
 window.showToast = showToast;
