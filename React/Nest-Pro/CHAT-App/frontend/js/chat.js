@@ -210,9 +210,8 @@ async function openChat(id, type = 'user') {
     const msgInput = document.getElementById('messageInput');
     const msgContainer = document.getElementById('messagesContainer');
 
-    // Only proceed if we have the required elements
+    // Only proceed if we have the required elements (might be on status page)
     if (!activeChatEl) {
-        console.warn('Chat elements not found on page');
         return;
     }
 
@@ -276,7 +275,11 @@ async function updateChatHeader(id, type) {
 
 // Load messages
 async function loadMessages(id, type) {
-    messagesContainer.innerHTML = '<div class="flex justify-center py-8"><div class="loader-spinner"></div></div>';
+    // Get fresh reference to messagesContainer (may have been rebuilt by restoreChatArea)
+    const container = document.getElementById('messagesContainer');
+    if (!container) return;
+
+    container.innerHTML = '<div class="flex justify-center py-8"><div class="loader-spinner"></div></div>';
 
     try {
         const endpoint = type === 'room'
@@ -296,7 +299,10 @@ async function loadMessages(id, type) {
         }
     } catch (error) {
         console.error('Failed to load messages:', error);
-        messagesContainer.innerHTML = '<div class="text-center text-gray-500 py-8">Failed to load messages</div>';
+        const containerAgain = document.getElementById('messagesContainer');
+        if (containerAgain) {
+            containerAgain.innerHTML = '<div class="text-center text-gray-500 py-8">Failed to load messages</div>';
+        }
     }
 }
 

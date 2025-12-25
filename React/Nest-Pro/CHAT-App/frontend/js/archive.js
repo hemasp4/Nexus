@@ -110,18 +110,8 @@ function handleNavClick(navType, btn) {
             archiveState.currentView = 'chats';
             archiveState.isUnlocked = false;
             saveNavigationState('chats');
-            // Reset chat area placeholder if no active chat
-            const chatArea = document.getElementById('chatArea');
-            if (chatArea && !AppState.currentChat) {
-                chatArea.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full text-gray-500">
-                        <svg class="w-24 h-24 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                        </svg>
-                        <p class="text-lg">Select a chat to start messaging</p>
-                    </div>
-                `;
-            }
+            // Restore full chat area structure if needed
+            restoreChatArea();
             // Force reload contacts with fresh event handlers
             loadContacts();
             break;
@@ -1322,3 +1312,143 @@ window.showGroupNameStep = showGroupNameStep;
 window.createGroup = createGroup;
 window.closeNewGroupModal = closeNewGroupModal;
 window.selectGroupIcon = selectGroupIcon;
+window.restoreChatArea = restoreChatArea;
+
+// Restore chat area with full structure (needed when switching from status/other views)
+function restoreChatArea() {
+    const chatArea = document.getElementById('chatArea');
+    if (!chatArea) return;
+
+    // Check if activeChat element exists, if not, restore full structure
+    if (!document.getElementById('activeChat')) {
+        chatArea.innerHTML = `
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyState">
+                <div class="empty-state-icon">
+                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
+                        </path>
+                    </svg>
+                </div>
+                <h3>Welcome to NexusChat</h3>
+                <p>Select a conversation to start chatting or click the + button to add a new contact.</p>
+            </div>
+
+            <!-- Active Chat (Hidden by default) -->
+            <div class="hidden flex-col h-full" id="activeChat">
+                <!-- Chat Header -->
+                <header class="chat-header">
+                    <div class="chat-header-info">
+                        <button class="btn-icon md:hidden mr-2" id="backBtn">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                        </button>
+                        <div class="chat-header-avatar">
+                            <div class="avatar-placeholder" id="chatAvatar">U</div>
+                        </div>
+                        <div class="chat-header-details">
+                            <h3 id="chatName">User Name</h3>
+                            <span class="status" id="chatStatus">Online</span>
+                        </div>
+                    </div>
+                    <div class="chat-header-actions">
+                        <button class="btn-icon" id="voiceCallBtn" title="Voice Call">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z">
+                                </path>
+                            </svg>
+                        </button>
+                        <button class="btn-icon" id="videoCallBtn" title="Video Call">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                        </button>
+                        <button class="btn-icon" id="chatInfoBtn" title="Info">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Messages Container -->
+                <div class="messages-container" id="messagesContainer">
+                    <!-- Messages will be loaded here -->
+                </div>
+
+                <!-- Typing Indicator -->
+                <div class="px-6 py-2 hidden" id="typingIndicator">
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+
+                <!-- Message Input -->
+                <div class="message-input-container">
+                    <div class="message-input-wrapper">
+                        <div class="message-input-actions">
+                            <button class="input-action-btn" id="emojiBtn" title="Emoji">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                                    </path>
+                                </svg>
+                            </button>
+                            <button class="input-action-btn" id="attachBtn" title="Attach File">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
+                                    </path>
+                                </svg>
+                            </button>
+                        </div>
+                        <input type="text" class="message-input" id="messageInput" placeholder="Type a message...">
+                        <button class="send-btn" id="sendBtn">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Re-attach event listeners for send button
+        const sendBtn = document.getElementById('sendBtn');
+        const messageInput = document.getElementById('messageInput');
+        if (sendBtn && typeof handleSend === 'function') {
+            sendBtn.addEventListener('click', handleSend);
+        }
+        if (messageInput && typeof handleSend === 'function') {
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                }
+            });
+        }
+
+        // Re-attach back button listener
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                document.getElementById('activeChat')?.classList.add('hidden');
+                document.getElementById('emptyState')?.classList.remove('hidden');
+                document.getElementById('sidebar')?.classList.remove('hidden');
+            });
+        }
+    }
+
+    // If there was an active chat, reopen it
+    if (AppState.currentChat && typeof window.openChat === 'function') {
+        setTimeout(() => window.openChat(AppState.currentChat, AppState.currentChatType || 'user'), 50);
+    }
+}

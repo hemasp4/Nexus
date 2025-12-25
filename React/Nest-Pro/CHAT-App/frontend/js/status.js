@@ -259,7 +259,7 @@ function displayStatuses(statuses, username, isOwn) {
     let contentHTML;
     if (status.media_id) {
         if (isVideo) {
-            contentHTML = `<video id="statusVideo" src="${API_URL}/api/files/${status.media_id}" autoplay muted class="status-media"></video>`;
+            contentHTML = `<video id="statusVideo" src="${API_URL}/api/files/${status.media_id}" autoplay class="status-media"></video>`;
         } else {
             contentHTML = `<img id="statusImage" src="${API_URL}/api/files/${status.media_id}" alt="Status" class="status-media">`;
         }
@@ -306,9 +306,13 @@ function displayStatuses(statuses, username, isOwn) {
                         <button class="status-control-btn" onclick="toggleStatusMute()" title="Mute/Unmute">
                             <svg id="muteIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
-                                <path id="muteLine" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path>
+                                <path id="muteLine" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" style="display:none"></path>
                             </svg>
                         </button>
+                        <div class="status-volume-control">
+                            <input type="range" id="statusVolumeSlider" min="0" max="100" value="100" 
+                                   oninput="changeStatusVolume(this.value)" title="Volume">
+                        </div>
                     ` : ''}
                     <button class="status-control-btn" onclick="screenshotStatus()" title="Screenshot">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1788,12 +1792,22 @@ function toggleStatusVideo() {
     const video = document.getElementById('statusVideo');
     if (!video) return;
 
+    const progressBar = document.querySelector('.status-progress-bar.active');
+
     if (video.paused) {
         video.play();
         document.getElementById('playPauseIcon').innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>`;
+        // Resume progress bar animation
+        if (progressBar) {
+            progressBar.style.animationPlayState = 'running';
+        }
     } else {
         video.pause();
         document.getElementById('playPauseIcon').innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>`;
+        // Pause progress bar animation
+        if (progressBar) {
+            progressBar.style.animationPlayState = 'paused';
+        }
     }
     // Pause auto-advance timer when manually controlling video
     clearTimeout(statusState.statusTimer);
@@ -1899,3 +1913,21 @@ window.screenshotStatus = screenshotStatus;
 window.toggleStatusEmojiPicker = toggleStatusEmojiPicker;
 window.insertStatusEmoji = insertStatusEmoji;
 window.sendStatusReply = sendStatusReply;
+window.changeStatusVolume = changeStatusVolume;
+
+// Change video volume
+function changeStatusVolume(value) {
+    const video = document.getElementById('statusVideo');
+    if (!video) return;
+
+    video.volume = value / 100;
+
+    // Update mute button state if volume is 0
+    if (value == 0) {
+        video.muted = true;
+        document.getElementById('muteLine')?.style.setProperty('display', 'block');
+    } else if (video.muted) {
+        video.muted = false;
+        document.getElementById('muteLine')?.style.setProperty('display', 'none');
+    }
+}
