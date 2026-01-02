@@ -89,7 +89,8 @@ function handleNavClick(navType, btn) {
         starred: 'Starred',
         archived: 'Archived',
         settings: 'Settings',
-        profile: 'Profile'
+        profile: 'Profile',
+        arise: 'Arise AI'
     };
 
     document.getElementById('sidebarTitle').textContent = titles[navType] || 'Chats';
@@ -142,10 +143,134 @@ function handleNavClick(navType, btn) {
             // Switch to account section
             document.querySelector('[data-settings-section="account"]')?.click();
             break;
+        case 'arise':
+            archiveState.currentView = 'arise';
+            saveNavigationState('arise');
+            renderAriseView();
+            break;
         default:
             saveNavigationState(navType);
             showToast(`${titles[navType]} coming soon!`, 'info');
     }
+}
+
+// Render Arise AI View (ChatGPT-like interface)
+function renderAriseView() {
+    const chatArea = document.getElementById('chatArea');
+    if (!chatArea) return;
+
+    // Hide sidebar contact list and show AI view
+    const contactList = document.getElementById('contactList');
+    if (contactList) contactList.style.display = 'none';
+
+    chatArea.innerHTML = `
+        <div class="arise-container">
+            <!-- AI Sidebar -->
+            <div class="arise-sidebar" id="ariseSidebar">
+                <div class="arise-sidebar-header">
+                    <button class="arise-new-chat-btn" onclick="newAriseChat()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        New chat
+                    </button>
+                    <button class="arise-toggle-btn" onclick="toggleAriseSidebar()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="arise-search">
+                    <input type="text" placeholder="Search chats..." 
+                           onkeyup="searchAriseConversations(this.value)">
+                </div>
+                
+                <div class="arise-conversation-list" id="ariseConversationList">
+                    <!-- Conversations will be rendered here -->
+                </div>
+                
+                <!-- Projects Section -->
+                <div class="arise-projects-section">
+                    <div class="arise-section-title">Projects</div>
+                    <div id="ariseProjectsList"></div>
+                    <div class="arise-new-project-btn" onclick="showNewProjectModal()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        New project
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Chat Area -->
+            <div class="arise-chat-area" id="ariseChatArea">
+                <!-- Header with Model Selector -->
+                <div class="arise-chat-header">
+                    <div class="arise-model-selector">
+                        <button class="arise-model-btn" id="ariseModelBtn" onclick="toggleModelSelector()">
+                            <span class="model-name">Gemini Pro</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div class="arise-model-menu" id="ariseModelMenu">
+                            <!-- Models will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Messages -->
+                <div class="arise-messages" id="ariseMessages">
+                    <!-- Messages or welcome screen will be rendered here -->
+                </div>
+                
+                <!-- Input Area -->
+                <div class="arise-input-area">
+                    <div class="arise-attachments" id="ariseAttachments"></div>
+                    <div class="arise-input-container">
+                        <div class="arise-attach-btn">
+                            <button onclick="toggleAriseAttachMenu()" class="p-2 text-gray-400 hover:text-white">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                            </button>
+                            <div class="arise-attach-menu" id="ariseAttachMenu">
+                                <div class="arise-attach-option" onclick="handleAriseFileAttach()">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                                    </svg>
+                                    Add photos & files
+                                </div>
+                                <div class="arise-attach-option" onclick="showToast('Create image coming soon!', 'info')">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Create image
+                                </div>
+                            </div>
+                        </div>
+                        <div class="arise-input-wrapper">
+                            <textarea id="ariseInput" placeholder="Ask anything..." rows="1"
+                                      onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendToAriseEnhanced();}"
+                                      oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,150)+'px';"></textarea>
+                        </div>
+                        <button class="arise-send-btn" onclick="sendToAriseEnhanced()">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Initialize the AI interface
+    if (typeof renderAriseSidebar === 'function') renderAriseSidebar();
+    if (typeof renderAriseChat === 'function') renderAriseChat();
+    if (typeof renderModelSelector === 'function') renderModelSelector();
+    if (typeof renderAriseProjects === 'function') renderAriseProjects();
 }
 
 // Open archived chats with PIN protection
@@ -755,64 +880,14 @@ function setupAriseButton() {
     }
 }
 
-// Open Arise chat in main area
+// Open Arise chat in main area - now uses new ChatGPT-like interface
 function openAriseChat() {
     archiveState.currentView = 'arise';
     saveNavigationState('arise');
     document.getElementById('sidebarTitle').textContent = 'Arise AI';
 
-    // Keep contacts visible but show Arise chat in main area
-    const chatArea = document.getElementById('chatArea');
-    if (chatArea) {
-        chatArea.innerHTML = `
-            <div class="arise-chat-container">
-                <!-- Header -->
-                <header class="chat-header">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z">
-                                </path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-semibold text-white">Arise AI</h3>
-                            <p class="text-xs text-green-400">Online</p>
-                        </div>
-                    </div>
-                </header>
-                
-                <!-- Messages -->
-                <div class="messages-container" id="ariseMessages">
-                    <div class="flex justify-center py-4">
-                        <div class="message received max-w-md">
-                            <div class="message-content">
-                                <p>👋 Hello! I'm Arise, your AI assistant. How can I help you today?</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Input -->
-                <footer class="message-input-container">
-                    <div class="message-input-wrapper">
-                        <input type="text" id="ariseInput" class="message-input" placeholder="Ask Arise anything...">
-                        <button class="btn-primary px-4 py-2 rounded-lg ml-2" onclick="sendAriseMessage()">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </footer>
-            </div>
-        `;
-
-        // Setup enter key for Arise input
-        document.getElementById('ariseInput')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendAriseMessage();
-        });
-    }
+    // Use the new enhanced AI interface
+    renderAriseView();
 }
 
 // Send message to Arise AI
@@ -940,6 +1015,9 @@ let selectedGroupMembers = [];
 function showNewGroupModal() {
     document.getElementById('newChatDropdown')?.classList.add('hidden');
     selectedGroupMembers = [];
+
+    // Remove any existing modal to prevent stacking
+    document.getElementById('newGroupModal')?.remove();
 
     const modal = document.createElement('div');
     modal.className = 'pin-modal';
@@ -1079,7 +1157,7 @@ function showGroupNameStep() {
         <div class="new-group-modal">
             <!-- Header -->
             <div class="new-group-header">
-                <button class="text-white" onclick="showNewGroupModal()">
+                <button class="text-white" onclick="goBackToMemberSelect()">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                     </svg>
@@ -1095,7 +1173,7 @@ function showGroupNameStep() {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                 </div>
-                <input type="text" id="groupNameInput" placeholder="Group name" class="group-name-input" maxlength="100">
+                <input type="text" id="modalGroupNameInput" placeholder="Group name" class="group-name-input" maxlength="100">
             </div>
             
             <!-- Members Preview -->
@@ -1116,13 +1194,19 @@ function showGroupNameStep() {
         </div>
     `;
 
-    document.getElementById('groupNameInput')?.focus();
+    document.getElementById('modalGroupNameInput')?.focus();
 }
 
 // Create the group
 async function createGroup() {
-    const nameInput = document.getElementById('groupNameInput');
+    const nameInput = document.getElementById('modalGroupNameInput');
+    console.log('Name input element:', nameInput);
+    console.log('Name input value:', nameInput?.value);
+
     const groupName = nameInput?.value?.trim();
+
+    console.log('Creating group:', groupName);
+    console.log('Selected members:', selectedGroupMembers);
 
     if (!groupName) {
         showToast('Please enter a group name', 'error');
@@ -1134,40 +1218,109 @@ async function createGroup() {
         return;
     }
 
+    console.log('Validations passed, about to call API');
+
     try {
+        const payload = {
+            name: groupName,
+            members: selectedGroupMembers.map(m => m.id)
+        };
+        console.log('API Payload:', payload);
+
         const response = await fetch(`${API_URL}/api/rooms`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${AppState.token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                name: groupName,
-                members: selectedGroupMembers.map(m => m.id)
-            })
+            body: JSON.stringify(payload)
         });
+
+        console.log('Response status:', response.status);
 
         if (response.ok) {
             const data = await response.json();
-            showToast('Group created successfully!', 'success');
-            closeNewGroupModal();
+            console.log('✅ Group created:', data);
 
-            // Reload rooms and open the new group
-            if (typeof loadRooms === 'function') {
-                await loadRooms();
+            // Step 1: Show success message
+            showToast('Group created successfully!', 'success');
+            console.log('Step 1: Toast shown');
+
+            // Step 2: Close the modal - CRITICAL
+            try {
+                const modal = document.getElementById('newGroupModal');
+                if (modal) {
+                    modal.remove();
+                    console.log('Step 2: Modal removed');
+                } else {
+                    console.log('Step 2: Modal not found, already removed?');
+                }
+                selectedGroupMembers = [];
+            } catch (e) {
+                console.error('Error closing modal:', e);
             }
 
-            // Open the new group chat
-            if (data.room_id && typeof openChat === 'function') {
-                openChat(data.room_id, 'room');
+            // Step 3: Update archiveState and reload rooms
+            try {
+                if (window.archiveState) {
+                    window.archiveState.currentView = 'groups';
+                }
+                if (typeof window.loadRooms === 'function') {
+                    await window.loadRooms();
+                    console.log('Step 3: Rooms loaded');
+                }
+            } catch (e) {
+                console.error('Error loading rooms:', e);
+            }
+
+            // Step 4: Navigate to groups section
+            try {
+                const navBtns = document.querySelectorAll('.nav-btn');
+                navBtns.forEach(btn => btn.classList.remove('active'));
+                const groupsBtn = document.querySelector('[data-nav="groups"]');
+                if (groupsBtn) {
+                    groupsBtn.classList.add('active');
+                    console.log('Step 4: Groups nav activated');
+                }
+            } catch (e) {
+                console.error('Error navigating:', e);
+            }
+
+            // Step 5: Render groups list
+            try {
+                if (typeof window.renderGroups === 'function') {
+                    window.archiveState.currentView = 'groups'; // Ensure view is set
+                    window.renderGroups();
+                    console.log('Step 5: Groups rendered');
+                }
+            } catch (e) {
+                console.error('Error rendering groups:', e);
+            }
+
+            // Step 6: Open the new group chat
+            try {
+                if (data.id && typeof window.openChat === 'function') {
+                    setTimeout(() => {
+                        window.openChat(data.id, 'room');
+                        console.log('Step 6: Chat opened');
+                    }, 200);
+                }
+            } catch (e) {
+                console.error('Error opening chat:', e);
             }
         } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to create group', 'error');
+            const errorText = await response.text();
+            console.error('Group creation failed:', response.status, errorText);
+            try {
+                const error = JSON.parse(errorText);
+                showToast(error.detail || 'Failed to create group', 'error');
+            } catch {
+                showToast('Failed to create group: ' + response.status, 'error');
+            }
         }
     } catch (error) {
         console.error('Error creating group:', error);
-        showToast('Failed to create group', 'error');
+        showToast('Failed to create group: ' + error.message, 'error');
     }
 }
 
@@ -1176,6 +1329,53 @@ function closeNewGroupModal() {
     document.getElementById('newGroupModal')?.remove();
     selectedGroupMembers = [];
     window.selectedGroupIcon = null;
+}
+
+// Go back to member selection step (without resetting selected members)
+function goBackToMemberSelect() {
+    const modal = document.getElementById('newGroupModal');
+    if (!modal) return;
+
+    modal.innerHTML = `
+        <div class="new-group-modal">
+            <!-- Header -->
+            <div class="new-group-header">
+                <button class="text-white" onclick="closeNewGroupModal()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                </button>
+                <h3 class="text-lg font-semibold text-white">New group</h3>
+                <span class="text-sm text-gray-400" id="memberCount">${selectedGroupMembers.length}/${AppState.contacts?.length || 0}</span>
+            </div>
+            
+            <!-- Selected Members -->
+            <div class="selected-members-container" id="selectedMembersContainer">
+                <div class="selected-members" id="selectedMembers"></div>
+                <input type="text" id="groupSearchInput" placeholder="Search contacts..." class="group-search-input">
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="group-action-buttons">
+                <button class="btn-primary flex-1 py-3 rounded-lg" id="nextGroupBtn" onclick="showGroupNameStep()" ${selectedGroupMembers.length === 0 ? 'disabled' : ''}>Next</button>
+                <button class="btn-secondary flex-1 py-3 rounded-lg" onclick="closeNewGroupModal()">Cancel</button>
+            </div>
+            
+            <!-- Contacts List -->
+            <div class="group-section-title">All contacts</div>
+            <div class="group-contacts-list" id="groupContactsList">
+                ${renderGroupContacts()}
+            </div>
+        </div>
+    `;
+
+    // Update selected members UI
+    updateSelectedMembersUI();
+
+    // Setup search
+    document.getElementById('groupSearchInput')?.addEventListener('input', (e) => {
+        filterGroupContacts(e.target.value);
+    });
 }
 
 // Select group icon
@@ -1311,6 +1511,7 @@ window.toggleGroupMember = toggleGroupMember;
 window.showGroupNameStep = showGroupNameStep;
 window.createGroup = createGroup;
 window.closeNewGroupModal = closeNewGroupModal;
+window.goBackToMemberSelect = goBackToMemberSelect;
 window.selectGroupIcon = selectGroupIcon;
 window.restoreChatArea = restoreChatArea;
 

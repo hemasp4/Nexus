@@ -64,6 +64,128 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         settings=user_settings
     )
 
+# IMPORTANT: Static routes must come BEFORE dynamic routes like /{user_id}
+
+@router.get("/blocked", response_model=List[UserPublic])
+async def get_blocked_users(current_user: dict = Depends(get_current_user)):
+    """Get list of blocked users"""
+    db = get_db()
+    
+    user = await db.users.find_one({"_id": ObjectId(current_user["user_id"])})
+    blocked_ids = user.get("blocked_users", [])
+    
+    if not blocked_ids:
+        return []
+    
+    blocked_users = await db.users.find({
+        "_id": {"$in": [ObjectId(bid) for bid in blocked_ids]}
+    }).to_list(length=100)
+    
+    return [
+        UserPublic(
+            id=str(blocked["_id"]),
+            username=blocked["username"],
+            avatar=blocked.get("avatar"),
+            status=blocked.get("status", "offline"),
+            about=blocked.get("about", "Hey there! I'm using NexusChat")
+        )
+        for blocked in blocked_users
+    ]
+
+@router.post("/blocked/{user_id}")
+async def block_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Block a user"""
+    db = get_db()
+    
+    if user_id == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="Cannot block yourself")
+    
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["user_id"])},
+        {"$addToSet": {"blocked_users": user_id}}
+    )
+    
+    return {"message": "User blocked successfully"}
+
+@router.delete("/blocked/{user_id}")
+async def unblock_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Unblock a user"""
+    db = get_db()
+    
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["user_id"])},
+        {"$pull": {"blocked_users": user_id}}
+    )
+    
+    return {"message": "User unblocked successfully"}
+
+@router.get("/contacts/list", response_model=List[UserPublic])
+async def get_contacts(current_user: dict = Depends(get_current_user)):
+    """Get all contacts"""
+    db = get_db()
+    
+    user = await db.users.find_one({"_id": ObjectId(current_user["user_id"])})
+    contact_ids = user.get("contacts", [])
+    
+    if not contact_ids:
+        return []
+    
+    contacts = await db.users.find({
+        "_id": {"$in": [ObjectId(cid) for cid in contact_ids]}
+    }).to_list(length=100)
+    
+    return [
+        UserPublic(
+            id=str(contact["_id"]),
+            username=contact["username"],
+            avatar=contact.get("avatar"),
+            status=contact.get("status", "offline"),
+            about=contact.get("about", "Hey there! I'm using NexusChat")
+        )
+        for contact in contacts
+    ]
+
+@router.post("/contacts/{contact_id}")
+async def add_contact(contact_id: str, current_user: dict = Depends(get_current_user)):
+    """Add a contact (mutual add)"""
+    db = get_db()
+    
+    # Can't add yourself
+    if contact_id == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="Cannot add yourself as contact")
+    
+    # Check if contact exists
+    contact = await db.users.find_one({"_id": ObjectId(contact_id)})
+    if not contact:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Add to current user's contacts list
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["user_id"])},
+        {"$addToSet": {"contacts": contact_id}}
+    )
+    
+    # Also add current user to contact's contacts list (mutual add)
+    await db.users.update_one(
+        {"_id": ObjectId(contact_id)},
+        {"$addToSet": {"contacts": current_user["user_id"]}}
+    )
+    
+    return {"message": "Contact added successfully"}
+
+@router.delete("/contacts/{contact_id}")
+async def remove_contact(contact_id: str, current_user: dict = Depends(get_current_user)):
+    """Remove a contact"""
+    db = get_db()
+    
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["user_id"])},
+        {"$pull": {"contacts": contact_id}}
+    )
+    
+    return {"message": "Contact removed successfully"}
+
+# Dynamic route MUST come AFTER static routes
 @router.get("/{user_id}", response_model=UserPublic)
 async def get_user(user_id: str, current_user: dict = Depends(get_current_user)):
     """Get user by ID"""
@@ -109,69 +231,3 @@ async def update_profile(
         contacts=user.get("contacts", []),
         created_at=user["created_at"]
     )
-
-@router.post("/contacts/{contact_id}")
-async def add_contact(contact_id: str, current_user: dict = Depends(get_current_user)):
-    """Add a contact (mutual add)"""
-    db = get_db()
-    
-    # Can't add yourself
-    if contact_id == current_user["user_id"]:
-        raise HTTPException(status_code=400, detail="Cannot add yourself as contact")
-    
-    # Check if contact exists
-    contact = await db.users.find_one({"_id": ObjectId(contact_id)})
-    if not contact:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Add to current user's contacts list
-    await db.users.update_one(
-        {"_id": ObjectId(current_user["user_id"])},
-        {"$addToSet": {"contacts": contact_id}}
-    )
-    
-    # Also add current user to contact's contacts list (mutual add)
-    await db.users.update_one(
-        {"_id": ObjectId(contact_id)},
-        {"$addToSet": {"contacts": current_user["user_id"]}}
-    )
-    
-    return {"message": "Contact added successfully"}
-
-@router.delete("/contacts/{contact_id}")
-async def remove_contact(contact_id: str, current_user: dict = Depends(get_current_user)):
-    """Remove a contact"""
-    db = get_db()
-    
-    await db.users.update_one(
-        {"_id": ObjectId(current_user["user_id"])},
-        {"$pull": {"contacts": contact_id}}
-    )
-    
-    return {"message": "Contact removed successfully"}
-
-@router.get("/contacts/list", response_model=List[UserPublic])
-async def get_contacts(current_user: dict = Depends(get_current_user)):
-    """Get all contacts"""
-    db = get_db()
-    
-    user = await db.users.find_one({"_id": ObjectId(current_user["user_id"])})
-    contact_ids = user.get("contacts", [])
-    
-    if not contact_ids:
-        return []
-    
-    contacts = await db.users.find({
-        "_id": {"$in": [ObjectId(cid) for cid in contact_ids]}
-    }).to_list(length=100)
-    
-    return [
-        UserPublic(
-            id=str(contact["_id"]),
-            username=contact["username"],
-            avatar=contact.get("avatar"),
-            status=contact.get("status", "offline"),
-            about=contact.get("about", "Hey there! I'm using NexusChat")
-        )
-        for contact in contacts
-    ]

@@ -308,8 +308,12 @@ async function loadMessages(id, type) {
 
 // Render messages with date separators
 function renderMessages(messages) {
+    // Get fresh reference to messagesContainer (may have been rebuilt by restoreChatArea)
+    const container = document.getElementById('messagesContainer');
+    if (!container) return;
+
     if (messages.length === 0) {
-        messagesContainer.innerHTML = `
+        container.innerHTML = `
             <div class="flex flex-col items-center justify-center h-full text-center text-gray-500">
                 <p>No messages yet</p>
                 <p class="text-sm mt-1">Send a message to start the conversation</p>
@@ -339,7 +343,7 @@ function renderMessages(messages) {
         html += createMessageHTML(msg);
     });
 
-    messagesContainer.innerHTML = html;
+    container.innerHTML = html;
     scrollToBottom();
 }
 
@@ -499,8 +503,14 @@ function createMessageHTML(msg) {
 
 // Append single message
 function appendMessage(msg) {
+    // Get fresh reference to messagesContainer (may have been rebuilt)
+    const container = document.getElementById('messagesContainer');
+    if (!container) {
+        console.error('appendMessage: messagesContainer not found');
+        return;
+    }
     const html = createMessageHTML(msg);
-    messagesContainer.insertAdjacentHTML('beforeend', html);
+    container.insertAdjacentHTML('beforeend', html);
 }
 
 // Update message status
@@ -625,7 +635,10 @@ async function uploadAndSendFile(file) {
 
 // Scroll to bottom
 function scrollToBottom() {
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    const container = document.getElementById('messagesContainer');
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 // Escape HTML

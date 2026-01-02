@@ -95,15 +95,24 @@ async def chat_page():
     return FileResponse(str(FRONTEND_DIR / "chat.html"))
 
 
-@app.websocket("/ws/{token}")
-async def websocket_endpoint(websocket: WebSocket, token: str):
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str, token: str = None):
     """WebSocket endpoint for real-time messaging"""
     
-    # Authenticate
+    # Authenticate - get token from query parameter
+    if not token:
+        await websocket.close(code=4001)
+        return
+    
     try:
         payload = decode_token(token)
-        user_id = payload.get("sub")
+        token_user_id = payload.get("sub")
         username = payload.get("username")
+        
+        # Verify the user_id matches the token
+        if token_user_id != user_id:
+            await websocket.close(code=4001)
+            return
     except Exception:
         await websocket.close(code=4001)
         return
@@ -348,6 +357,82 @@ async def handle_call_end(user_id: str, data: dict):
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "app": settings.APP_NAME}
+
+
+# NexusChat Auto-Save endpoint
+NEXUSCHAT_BASE = pathlib.Path("C:/NexusChat")
+
+@app.post("/api/files/auto-save/{file_id}")
+async def auto_save_file(file_id: str, file_type: str = "file"):
+    """
+    Auto-save a file to C:/NexusChat folders
+    Creates the folder structure if it doesn't exist:
+    - C:/NexusChat/Images/
+    - C:/NexusChat/Videos/
+    - C:/NexusChat/Files/
+    """
+    try:
+        db = await get_db()
+        from bson import ObjectId
+        import gridfs
+        
+        # Determine folder based on file type
+        if file_type == "image":
+            folder = NEXUSCHAT_BASE / "Images"
+        elif file_type == "video":
+            folder = NEXUSCHAT_BASE / "Videos"
+        else:
+            folder = NEXUSCHAT_BASE / "Files"
+        
+        # Create folders if they don't exist
+        folder.mkdir(parents=True, exist_ok=True)
+        
+        # Get file from GridFS
+        fs = gridfs.GridFS(db)
+        if len(file_id) == 24:
+            file_obj = fs.get(ObjectId(file_id))
+        else:
+            # Try to find by filename
+            file_obj = fs.find_one({"filename": file_id})
+            if file_obj:
+                file_obj = fs.get(file_obj._id)
+        
+        if not file_obj:
+            return {"success": False, "error": "File not found"}
+        
+        # Get filename
+        filename = file_obj.filename or f"file_{file_id}"
+        
+        # Check if file already exists
+        target_path = folder / filename
+        if target_path.exists():
+            return {"success": True, "message": "File already exists", "path": str(target_path)}
+        
+        # Save the file
+        with open(target_path, 'wb') as f:
+            f.write(file_obj.read())
+        
+        return {"success": True, "message": "File saved", "path": str(target_path)}
+    
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/files/init-folders")
+async def init_nexuschat_folders():
+    """Initialize NexusChat folder structure"""
+    try:
+        (NEXUSCHAT_BASE / "Images").mkdir(parents=True, exist_ok=True)
+        (NEXUSCHAT_BASE / "Videos").mkdir(parents=True, exist_ok=True)
+        (NEXUSCHAT_BASE / "Files").mkdir(parents=True, exist_ok=True)
+        return {
+            "success": True, 
+            "message": "Folders created", 
+            "path": str(NEXUSCHAT_BASE),
+            "folders": ["Images", "Videos", "Files"]
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 if __name__ == "__main__":

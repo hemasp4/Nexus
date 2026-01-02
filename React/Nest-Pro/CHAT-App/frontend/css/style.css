@@ -214,6 +214,7 @@ body {
     background: var(--bg-elevated);
     color: var(--text-primary);
     border-color: var(--accent-primary);
+    
 }
 
 /* ==========================================
@@ -2522,19 +2523,35 @@ body.font-large .contact-last-message {
 
 .call-avatar {
     position: relative;
+    width: 48px !important;
+    height: 48px !important;
+    flex-shrink: 0;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: none !important;
+    padding: 0 !important;
 }
 
 .call-avatar .avatar-placeholder {
-    width: 48px;
-    height: 48px;
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px;
+    max-width: 48px;
+    min-height: 48px;
+    max-height: 48px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
     font-weight: 600;
     font-size: 18px;
+    box-sizing: border-box;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .call-info {
@@ -4332,4 +4349,588 @@ body.font-large .contact-last-message {
     background: rgba(255, 255, 255, 0.3);
     height: 4px;
     border-radius: 2px;
+}
+
+/* ==========================================
+   Arise AI - Enhanced ChatGPT-like Interface
+   ========================================== */
+
+/* AI Main Container */
+.arise-container {
+    display: flex;
+    height: 100%;
+    background: var(--bg-primary);
+}
+
+/* AI Sidebar */
+.arise-sidebar {
+    width: 260px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s ease, transform 0.3s ease;
+}
+
+.arise-sidebar.collapsed {
+    width: 0;
+    overflow: hidden;
+    border: none;
+}
+
+.arise-sidebar-header {
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.arise-new-chat-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.arise-new-chat-btn:hover {
+    background: var(--bg-hover);
+}
+
+.arise-toggle-btn {
+    padding: 8px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.arise-toggle-btn:hover {
+    background: var(--bg-hover);
+}
+
+/* Sidebar Search */
+.arise-search {
+    padding: 0 12px 12px;
+}
+
+.arise-search input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.arise-search input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Section Title */
+.arise-section-title {
+    padding: 12px 16px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Conversation List */
+.arise-conversation-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 8px;
+}
+
+.arise-conv-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-bottom: 2px;
+}
+
+.arise-conv-item:hover {
+    background: var(--bg-hover);
+}
+
+.arise-conv-item.active {
+    background: var(--bg-tertiary);
+}
+
+.arise-conv-icon {
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.arise-conv-title {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.arise-conv-actions {
+    display: none;
+    gap: 4px;
+}
+
+.arise-conv-item:hover .arise-conv-actions {
+    display: flex;
+}
+
+.arise-conv-actions button {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.arise-conv-actions button:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+/* Projects Section */
+.arise-projects-section {
+    border-top: 1px solid var(--glass-border);
+    padding: 8px;
+}
+
+.arise-project-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.arise-project-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.arise-new-project-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.arise-new-project-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Chat Area */
+.arise-chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    transition: margin-left 0.3s ease;
+}
+
+.arise-chat-area.full-width {
+    margin-left: 0;
+}
+
+/* Chat Header */
+.arise-chat-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.arise-model-selector {
+    position: relative;
+}
+
+.arise-model-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.arise-model-btn:hover {
+    background: var(--bg-hover);
+}
+
+.arise-model-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    min-width: 200px;
+    display: none;
+    z-index: 100;
+}
+
+.arise-model-menu.active {
+    display: block;
+}
+
+.arise-model-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.arise-model-option:hover {
+    background: var(--bg-hover);
+}
+
+.arise-model-option.selected {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.model-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.model-name {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.model-provider {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Messages Container */
+.arise-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Welcome Screen */
+.arise-welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 40px;
+}
+
+.arise-logo {
+    width: 80px;
+    height: 80px;
+    background: var(--accent-gradient);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    color: white;
+}
+
+.arise-welcome-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 32px;
+}
+
+.arise-suggestions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    max-width: 600px;
+}
+
+.arise-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.arise-suggestion:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+}
+
+.arise-suggestion span {
+    font-size: 20px;
+}
+
+/* Message Styles */
+.arise-message {
+    display: flex;
+    gap: 16px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.arise-message.user {
+    flex-direction: row-reverse;
+}
+
+.arise-message-avatar {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.arise-message-avatar .avatar-placeholder {
+    width: 32px;
+    height: 32px;
+    background: var(--accent-gradient);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+}
+
+.arise-message-content {
+    flex: 1;
+    padding: 16px 20px;
+    background: var(--bg-tertiary);
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.arise-message.user .arise-message-content {
+    background: var(--accent-primary);
+}
+
+.arise-message-content code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+}
+
+/* Input Area */
+.arise-input-area {
+    padding: 16px 20px 24px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.arise-attachments {
+    display: none;
+    gap: 8px;
+    padding: 8px 0;
+    flex-wrap: wrap;
+}
+
+.arise-attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.arise-attachment-item img {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.remove-attachment {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 4px;
+}
+
+.remove-attachment:hover {
+    color: var(--text-primary);
+}
+
+.arise-input-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 8px 8px 8px 16px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.arise-attach-btn {
+    position: relative;
+}
+
+.arise-attach-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    min-width: 200px;
+    display: none;
+    z-index: 100;
+}
+
+.arise-attach-menu.active {
+    display: block;
+}
+
+.arise-attach-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.arise-attach-option:hover {
+    background: var(--bg-hover);
+}
+
+.arise-attach-option svg {
+    color: var(--text-secondary);
+}
+
+.arise-input-wrapper {
+    flex: 1;
+}
+
+.arise-input-wrapper textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    resize: none;
+    outline: none;
+    max-height: 200px;
+    line-height: 1.5;
+}
+
+.arise-input-wrapper textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.arise-send-btn {
+    width: 40px;
+    height: 40px;
+    background: var(--accent-gradient);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.arise-send-btn:hover {
+    transform: scale(1.05);
+}
+
+.arise-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Empty State */
+.arise-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .arise-sidebar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 50;
+        width: 280px;
+    }
+
+    .arise-sidebar.collapsed {
+        transform: translateX(-100%);
+    }
+
+    .arise-suggestions {
+        grid-template-columns: 1fr;
+    }
 }

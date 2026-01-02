@@ -98,6 +98,45 @@ async def get_room_messages(
     
     return result
 
+
+@router.get("/starred", response_model=List[MessageResponse])
+async def get_starred_messages(current_user: dict = Depends(get_current_user)):
+    """Get all starred messages for the current user"""
+    db = get_db()
+    
+    # Find all messages where current user is in starred_by array
+    messages = await db.messages.find({
+        "starred_by": current_user["user_id"],
+        "deleted": {"$ne": True}
+    }).sort("timestamp", -1).to_list(length=100)
+    
+    result = []
+    for msg in messages:
+        sender = await db.users.find_one({"_id": ObjectId(msg["sender_id"])})
+        result.append(MessageResponse(
+            id=str(msg["_id"]),
+            sender_id=msg["sender_id"],
+            sender_username=sender["username"] if sender else "Unknown",
+            sender_avatar=sender.get("avatar") if sender else None,
+            receiver_id=msg.get("receiver_id"),
+            room_id=msg.get("room_id"),
+            content=msg["content"],
+            message_type=msg.get("message_type", "text"),
+            file_id=msg.get("file_id"),
+            file_name=msg.get("file_name"),
+            file_size=msg.get("file_size"),
+            reply_to=msg.get("reply_to"),
+            read_by=msg.get("read_by", []),
+            delivered_to=msg.get("delivered_to", []),
+            starred_by=msg.get("starred_by", []),
+            timestamp=msg["timestamp"],
+            edited=msg.get("edited", False),
+            deleted=msg.get("deleted", False)
+        ))
+    
+    return result
+
+
 @router.post("/", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def send_message(
     message_data: MessageCreate,
@@ -178,3 +217,41 @@ async def delete_message(message_id: str, current_user: dict = Depends(get_curre
     )
     
     return {"message": "Message deleted"}
+
+
+@router.post("/{message_id}/star")
+async def star_message(message_id: str, current_user: dict = Depends(get_current_user)):
+    """Star a message for the current user"""
+    db = get_db()
+    
+    message = await db.messages.find_one({"_id": ObjectId(message_id)})
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Add user to starred_by array
+    await db.messages.update_one(
+        {"_id": ObjectId(message_id)},
+        {"$addToSet": {"starred_by": current_user["user_id"]}}
+    )
+    
+    return {"message": "Message starred", "starred": True}
+
+
+@router.delete("/{message_id}/star")
+async def unstar_message(message_id: str, current_user: dict = Depends(get_current_user)):
+    """Unstar a message for the current user"""
+    db = get_db()
+    
+    message = await db.messages.find_one({"_id": ObjectId(message_id)})
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Remove user from starred_by array
+    await db.messages.update_one(
+        {"_id": ObjectId(message_id)},
+        {"$pull": {"starred_by": current_user["user_id"]}}
+    )
+    
+    return {"message": "Message unstarred", "starred": False}

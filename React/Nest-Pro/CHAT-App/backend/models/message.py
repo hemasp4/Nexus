@@ -27,6 +27,7 @@ class MessageResponse(BaseModel):
     reply_to: Optional[str] = None
     read_by: List[str] = []
     delivered_to: List[str] = []
+    starred_by: List[str] = []
     timestamp: datetime
     edited: bool = False
     deleted: bool = False
@@ -43,6 +44,7 @@ class MessageInDB(BaseModel):
     reply_to: Optional[str] = None
     read_by: List[str] = []
     delivered_to: List[str] = []
+    starred_by: List[str] = []
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     edited: bool = False
     deleted: bool = False

@@ -133,10 +133,58 @@ async function loadRooms() {
 
         if (response.ok) {
             AppState.rooms = await response.json();
+            console.log('Loaded rooms:', AppState.rooms);
+            // Render groups if in groups view
+            renderGroups();
         }
     } catch (error) {
         console.error('Failed to load rooms:', error);
     }
+}
+
+// Render groups list
+function renderGroups() {
+    const contactList = document.getElementById('contactList');
+    if (!contactList) return;
+
+    // Check if we're in groups view (archiveState should have currentView = 'groups')
+    if (window.archiveState?.currentView !== 'groups') return;
+
+    if (!AppState.rooms || AppState.rooms.length === 0) {
+        contactList.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-64 text-gray-500">
+                <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                    </path>
+                </svg>
+                <p class="text-lg font-medium">No groups yet</p>
+                <p class="text-sm mt-1">Click + to create a new group</p>
+            </div>
+        `;
+        return;
+    }
+
+    contactList.innerHTML = AppState.rooms.map(room => {
+        const memberCount = room.members?.length || 0;
+        const initial = room.name?.charAt(0).toUpperCase() || 'G';
+        const lastMsg = room.last_message || 'No messages yet';
+
+        return `
+            <div class="contact-item" data-room-id="${room.id}" onclick="openChat('${room.id}', 'room')">
+                <div class="contact-avatar">
+                    ${room.avatar
+                ? `<img src="${API_URL}/api/files/${room.avatar}" alt="${room.name}">`
+                : `<div class="avatar-placeholder">${initial}</div>`
+            }
+                </div>
+                <div class="contact-info">
+                    <div class="contact-name">${room.name}</div>
+                    <div class="contact-message">${memberCount} members</div>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // Render contacts list
@@ -341,38 +389,7 @@ function showCreateGroupModal() {
     modal.classList.add('active');
 }
 
-// Create group
-async function createGroup() {
-    const name = document.getElementById('groupNameInput').value.trim();
-    const description = document.getElementById('groupDescInput').value.trim();
-    const memberCheckboxes = document.querySelectorAll('#groupMembersList input:checked');
-    const members = Array.from(memberCheckboxes).map(cb => cb.value);
-
-    if (!name) {
-        showToast('Please enter a group name', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/api/rooms`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${AppState.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ name, description, members })
-        });
-
-        if (response.ok) {
-            showToast('Group created!', 'success');
-            await loadRooms();
-            document.getElementById('createGroupModal').classList.remove('active');
-            switchSidebarTab('groups');
-        }
-    } catch (error) {
-        showToast('Failed to create group', 'error');
-    }
-}
+// createGroup function has been moved to archive.js
 
 // Show menu
 function showMenu() {
@@ -429,6 +446,7 @@ function showToast(message, type = 'info') {
 window.loadContacts = loadContacts;
 window.renderContacts = renderContacts;
 window.loadRooms = loadRooms;
+window.renderGroups = renderGroups;
 window.addContact = addContact;
 window.showCreateGroupModal = showCreateGroupModal;
 window.showToast = showToast;
