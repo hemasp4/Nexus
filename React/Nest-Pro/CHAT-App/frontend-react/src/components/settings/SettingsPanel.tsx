@@ -330,7 +330,31 @@ export function SettingsPanel() {
             case 'storage':
                 return (
                     <div style={styles.section}>
-                        <h3 style={styles.sectionTitle}>DATA MANAGEMENT</h3>
+                        <h3 style={styles.sectionTitle}>AUTO-SAVE FILES</h3>
+                        <div style={styles.settingRow}>
+                            <div style={styles.settingInfo}>
+                                <div style={styles.settingLabel}>Auto-save to NexusChat folder</div>
+                                <div style={styles.settingDesc}>Automatically save received files to C:\NexusChat</div>
+                            </div>
+                            <button style={styles.toggle(settings.autoSaveFiles || false)} onClick={() => handleSettingChange('autoSaveFiles', !settings.autoSaveFiles)}>
+                                <span style={styles.toggleKnob(settings.autoSaveFiles || false)} />
+                            </button>
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#71717a', padding: '8px 20px', marginBottom: '16px' }}>
+                            Files will be saved to:
+                            <br />• Images → C:\NexusChat\Images
+                            <br />• Videos → C:\NexusChat\Videos
+                            <br />• Documents → C:\NexusChat\Files
+                        </div>
+                        <div style={styles.settingRow}>
+                            <div style={styles.settingInfo}>
+                                <div style={styles.settingLabel}>Large file limit</div>
+                                <div style={styles.settingDesc}>Files over 50MB require manual download</div>
+                            </div>
+                            <span style={{ color: '#6366f1', fontSize: '14px' }}>50 MB</span>
+                        </div>
+
+                        <h3 style={{ ...styles.sectionTitle, marginTop: '32px' }}>DATA MANAGEMENT</h3>
                         <button style={{ ...styles.actionBtn, color: '#ef4444' }} onClick={() => { if (confirm('Clear all cached data?')) { clearCache(); alert('Cache cleared!'); } }}>
                             <div style={styles.actionBtnInner}>🗑️ Clear cache</div>
                             <div style={{ color: '#71717a' }}>Free up storage space</div>

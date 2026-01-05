@@ -108,6 +108,46 @@ export function useWebSocket() {
                         }
                         handleCallEnded();
                         break;
+
+                    // Group Call Signaling
+                    case 'group_call_incoming':
+                        console.log('📞 Incoming group call:', data);
+                        // Dispatch to UI for group call incoming modal
+                        window.dispatchEvent(new CustomEvent('groupCallIncoming', {
+                            detail: {
+                                roomId: data.room_id,
+                                callId: data.call_id,
+                                initiatorId: data.initiator_id,
+                                initiatorName: data.initiator_name,
+                                callType: data.call_type
+                            }
+                        }));
+                        break;
+
+                    case 'group_call_participant_joined':
+                        console.log('👤 Participant joined group call:', data);
+                        window.dispatchEvent(new CustomEvent('groupCallParticipantJoined', { detail: data }));
+                        break;
+
+                    case 'group_call_participant_left':
+                        console.log('👤 Participant left group call:', data);
+                        window.dispatchEvent(new CustomEvent('groupCallParticipantLeft', { detail: data }));
+                        break;
+
+                    case 'group_call_offer':
+                        console.log('📞 Group call offer from:', data.from);
+                        window.dispatchEvent(new CustomEvent('groupCallOffer', { detail: data }));
+                        break;
+
+                    case 'group_call_answer':
+                        console.log('📞 Group call answer from:', data.from);
+                        window.dispatchEvent(new CustomEvent('groupCallAnswer', { detail: data }));
+                        break;
+
+                    case 'group_call_ice':
+                        console.log('🧊 Group call ICE from:', data.from);
+                        window.dispatchEvent(new CustomEvent('groupCallIce', { detail: data }));
+                        break;
                 }
             } catch (error) {
                 console.error('WebSocket message parse error:', error);

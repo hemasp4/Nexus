@@ -39,6 +39,7 @@ export function MessageBubble({ message, onReply, onForward, onImageClick, onVid
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEmojiReactions, setShowEmojiReactions] = useState(false);
   const [showMessageInfo, setShowMessageInfo] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
   const [isFileDownloaded, setIsFileDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadedBlob, setDownloadedBlob] = useState<Blob | null>(null);
@@ -55,6 +56,32 @@ export function MessageBubble({ message, onReply, onForward, onImageClick, onVid
       }
     }
   }, [message.file_id]);
+
+  // Check if message is pinned
+  const [isPinned, setIsPinned] = useState(false);
+  useEffect(() => {
+    const checkPinned = () => {
+      const pinnedMessages = JSON.parse(localStorage.getItem('pinnedMessages') || '{}');
+      const pinData = pinnedMessages[message.id];
+      if (pinData) {
+        // Check if expired
+        if (new Date(pinData.expiresAt) < new Date()) {
+          // Remove expired pin
+          delete pinnedMessages[message.id];
+          localStorage.setItem('pinnedMessages', JSON.stringify(pinnedMessages));
+          setIsPinned(false);
+        } else {
+          setIsPinned(true);
+        }
+      } else {
+        setIsPinned(false);
+      }
+    };
+    checkPinned();
+    // Re-check periodically
+    const interval = setInterval(checkPinned, 10000);
+    return () => clearInterval(interval);
+  }, [message.id]);
 
   // Ref for emoji dropdown menu
   const emojiMenuRef = useRef<HTMLDivElement>(null);
@@ -102,23 +129,6 @@ export function MessageBubble({ message, onReply, onForward, onImageClick, onVid
   // Check for links in message
   const urls = message.content?.match(URL_REGEX) || [];
   const hasLinks = urls.length > 0 && message.message_type === 'text';
-
-  const handleCopy = async () => {
-    try {
-      if (message.file_id) {
-        // For media/files, copy the file URL to clipboard
-        const fileUrl = `${API_URL}/api/files/${message.file_id}`;
-        await navigator.clipboard.writeText(fileUrl);
-      } else {
-        // For text messages, copy the content
-        await navigator.clipboard.writeText(message.content || '');
-      }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Copy failed:', error);
-    }
-  };
 
   // Download file and mark as downloaded (WhatsApp-style first phase)
   const handleDownload = async () => {
@@ -310,13 +320,121 @@ export function MessageBubble({ message, onReply, onForward, onImageClick, onVid
       } else {
         // Fallback: copy to clipboard
         await navigator.clipboard.writeText(shareData.text || shareData.url || '');
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
       }
     } catch (error) {
       // User cancelled or share failed
       console.log('Share cancelled or failed:', error);
     }
+  };
+
+  // Copy message content or media to clipboard
+  const handleCopy = async () => {
+    try {
+      if (message.message_type === 'text') {
+        // Copy text content
+        await navigator.clipboard.writeText(message.content || '');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else if (message.file_id) {
+        // For media/files, try to copy the actual file data
+        try {
+          const response = await fetch(`${API_URL}/api/files/${message.file_id}`);
+          const blob = await response.blob();
+
+          // Try to copy image to clipboard (works for images in Chromium browsers)
+          if ((message.message_type === 'image' || blob.type.startsWith('image/')) && 'ClipboardItem' in window) {
+            // Convert to PNG for better clipboard compatibility
+            const img = new Image();
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx?.drawImage(img, 0, 0);
+                canvas.toBlob(async (pngBlob) => {
+                  if (pngBlob) {
+                    try {
+                      const clipboardItem = new ClipboardItem({ 'image/png': pngBlob });
+                      await navigator.clipboard.write([clipboardItem]);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    } catch {
+                      // If clipboard fails, copy URL
+                      await navigator.clipboard.writeText(`${API_URL}/api/files/${message.file_id}`);
+                    }
+                  }
+                  resolve();
+                }, 'image/png');
+              };
+              img.onerror = reject;
+              img.src = URL.createObjectURL(blob);
+            });
+          } else {
+            // For other file types, copy the URL (users can paste to download)
+            await navigator.clipboard.writeText(`${API_URL}/api/files/${message.file_id}`);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }
+        } catch (clipboardError) {
+          // Fallback: copy file URL
+          await navigator.clipboard.writeText(`${API_URL}/api/files/${message.file_id}`);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }
+      }
+    } catch (error) {
+      console.error('Copy failed:', error);
+    }
+  };
+
+  // Pin message
+  const handlePin = () => {
+    // TODO: Implement pin functionality via backend API
+    console.log('Pin message:', message.id);
+    // For now, store in localStorage as placeholder
+    const pinnedMessages = JSON.parse(localStorage.getItem('pinnedMessages') || '{}');
+    if (pinnedMessages[message.id]) {
+      // Already pinned - unpin it
+      delete pinnedMessages[message.id];
+      localStorage.setItem('pinnedMessages', JSON.stringify(pinnedMessages));
+    } else {
+      // Not pinned - show duration modal
+      setShowPinModal(true);
+    }
+  };
+
+  // Pin with duration
+  const handlePinWithDuration = (duration: 'custom' | '24h' | '7d' | '30d', customMinutes?: number) => {
+    const pinnedMessages = JSON.parse(localStorage.getItem('pinnedMessages') || '{}');
+
+    let expiresAt: Date;
+    const now = new Date();
+
+    if (duration === 'custom' && customMinutes) {
+      expiresAt = new Date(now.getTime() + customMinutes * 60 * 1000);
+    } else if (duration === '24h') {
+      expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    } else if (duration === '7d') {
+      expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    } else { // 30d
+      expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    }
+
+    pinnedMessages[message.id] = {
+      chatId: currentChatId,
+      pinnedAt: now.toISOString(),
+      pinnedBy: user?.id,
+      pinnedByName: user?.username,
+      expiresAt: expiresAt.toISOString(),
+      duration: duration,
+      messageContent: message.content || message.file_name || 'Media',
+      messageType: message.message_type
+    };
+
+    localStorage.setItem('pinnedMessages', JSON.stringify(pinnedMessages));
+    setShowPinModal(false);
   };
 
   // Navigate to status when clicking status reply
@@ -958,10 +1076,13 @@ export function MessageBubble({ message, onReply, onForward, onImageClick, onVid
                 <div style={{ padding: '4px 0' }}>
                   <ReactionMenuItem icon="↩" label="Reply" onClick={() => { onReply(message); setShowEmojiReactions(false); }} />
                   <ReactionMenuItem icon="📋" label="Copy" onClick={() => { handleCopy(); setShowEmojiReactions(false); }} />
-                  <ReactionMenuItem icon="💾" label="Save as..." onClick={() => { handleDownload(); setShowEmojiReactions(false); }} />
+                  {/* Save as - only show for media/files, not text messages */}
+                  {message.message_type !== 'text' && (
+                    <ReactionMenuItem icon="💾" label="Save as..." onClick={() => { handleSaveAs(); setShowEmojiReactions(false); }} />
+                  )}
                   <ReactionMenuItem icon="↪" label="Forward" onClick={() => { onForward(message); setShowEmojiReactions(false); }} />
                   <ReactionMenuItem icon={isStarred ? "⭐" : "☆"} label="Star" onClick={() => { handleStar(); setShowEmojiReactions(false); }} />
-                  <ReactionMenuItem icon="📌" label="Pin" onClick={() => setShowEmojiReactions(false)} />
+                  <ReactionMenuItem icon="📌" label="Pin" onClick={() => { handlePin(); setShowEmojiReactions(false); }} />
                   <ReactionMenuItem icon="🗑" label="Delete" onClick={() => { setShowDeleteModal(true); setShowEmojiReactions(false); }} />
                   <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
                   <ReactionMenuItem icon="☑️" label="Select" onClick={() => { toggleSelectionMode(true); toggleMessageSelection(message.id); setShowEmojiReactions(false); }} />
@@ -1081,8 +1202,11 @@ export function MessageBubble({ message, onReply, onForward, onImageClick, onVid
 
           {renderContent()}
 
-          {/* Time, star & read status */}
+          {/* Time, pin, star & read status */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '2px', fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>
+            {isPinned && (
+              <span title="Pinned message" style={{ color: '#6366f1' }}>📌</span>
+            )}
             {isStarred && (
               <svg width="10" height="10" fill="#fbbf24" viewBox="0 0 24 24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -1256,7 +1380,7 @@ export function MessageBubble({ message, onReply, onForward, onImageClick, onVid
                 <ReactionMenuItem icon="💾" label="Save as..." onClick={() => { handleDownload(); setShowEmojiReactions(false); }} />
                 <ReactionMenuItem icon="↪" label="Forward" onClick={() => { onForward(message); setShowEmojiReactions(false); }} />
                 <ReactionMenuItem icon={isStarred ? "⭐" : "☆"} label="Star" onClick={() => { handleStar(); setShowEmojiReactions(false); }} />
-                <ReactionMenuItem icon="📌" label="Pin" onClick={() => setShowEmojiReactions(false)} />
+                <ReactionMenuItem icon="📌" label="Pin" onClick={() => { handlePin(); setShowEmojiReactions(false); }} />
                 <ReactionMenuItem icon="🗑" label="Delete" onClick={() => { setShowDeleteModal(true); setShowEmojiReactions(false); }} />
                 <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
                 <ReactionMenuItem icon="☑️" label="Select" onClick={() => { toggleSelectionMode(true); toggleMessageSelection(message.id); setShowEmojiReactions(false); }} />
@@ -1274,6 +1398,14 @@ export function MessageBubble({ message, onReply, onForward, onImageClick, onVid
           message={message}
           isOwnMessage={isOwnMessage}
           onClose={() => setShowMessageInfo(false)}
+        />
+      )}
+
+      {/* Pin Duration Modal */}
+      {showPinModal && (
+        <PinDurationModal
+          onClose={() => setShowPinModal(false)}
+          onPin={handlePinWithDuration}
         />
       )}
     </div>
@@ -1955,6 +2087,203 @@ function MessageInfoPopup({ message, isOwnMessage, onClose }: { message: Message
           <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
             {formatTime(message.delivered_at || message.created_at)}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Pin Duration Modal - WhatsApp style
+function PinDurationModal({
+  onClose,
+  onPin
+}: {
+  onClose: () => void;
+  onPin: (duration: 'custom' | '24h' | '7d' | '30d', customMinutes?: number) => void;
+}) {
+  const [selectedDuration, setSelectedDuration] = useState<'24h' | '7d' | '30d' | 'custom'>('7d');
+  const [customValue, setCustomValue] = useState(30);
+  const [customUnit, setCustomUnit] = useState<'minutes' | 'hours' | 'days'>('minutes');
+
+  const calculateMinutes = () => {
+    if (customUnit === 'minutes') return customValue;
+    if (customUnit === 'hours') return customValue * 60;
+    return customValue * 24 * 60; // days
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000
+    }} onClick={onClose}>
+      <div style={{
+        background: '#1e1e2e',
+        borderRadius: '12px',
+        padding: '24px',
+        width: '320px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+      }} onClick={e => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 8px 0', color: '#fff', fontSize: '18px', fontWeight: 600 }}>
+          Choose how long your pin lasts
+        </h3>
+        <p style={{ margin: '0 0 20px 0', color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>
+          You can unpin at any time.
+        </p>
+
+        {/* Duration options */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+          {(['24h', '7d', '30d'] as const).map(duration => (
+            <label
+              key={duration}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                cursor: 'pointer',
+                padding: '8px 0'
+              }}
+            >
+              <div style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                border: selectedDuration === duration ? 'none' : '2px solid rgba(255,255,255,0.4)',
+                background: selectedDuration === duration ? '#25D366' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {selectedDuration === duration && (
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fff' }} />
+                )}
+              </div>
+              <span style={{ color: '#fff', fontSize: '15px' }}>
+                {duration === '24h' ? '24 hours' : duration === '7d' ? '7 days' : '30 days'}
+              </span>
+              <input
+                type="radio"
+                name="duration"
+                checked={selectedDuration === duration}
+                onChange={() => setSelectedDuration(duration)}
+                style={{ display: 'none' }}
+              />
+            </label>
+          ))}
+
+          {/* Custom duration option */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer',
+            padding: '8px 0'
+          }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              border: selectedDuration === 'custom' ? 'none' : '2px solid rgba(255,255,255,0.4)',
+              background: selectedDuration === 'custom' ? '#25D366' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              {selectedDuration === 'custom' && (
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fff' }} />
+              )}
+            </div>
+            <span style={{ color: '#fff', fontSize: '15px' }}>Custom</span>
+            <input
+              type="radio"
+              name="duration"
+              checked={selectedDuration === 'custom'}
+              onChange={() => setSelectedDuration('custom')}
+              style={{ display: 'none' }}
+            />
+          </label>
+
+          {/* Custom duration inputs */}
+          {selectedDuration === 'custom' && (
+            <div style={{ display: 'flex', gap: '8px', marginLeft: '32px' }}>
+              <input
+                type="number"
+                min="1"
+                value={customValue}
+                onChange={e => setCustomValue(Math.max(1, parseInt(e.target.value) || 1))}
+                style={{
+                  width: '60px',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  fontSize: '14px'
+                }}
+              />
+              <select
+                value={customUnit}
+                onChange={e => setCustomUnit(e.target.value as any)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="minutes" style={{ background: '#1e1e2e' }}>Minutes</option>
+                <option value="hours" style={{ background: '#1e1e2e' }}>Hours</option>
+                <option value="days" style={{ background: '#1e1e2e' }}>Days</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '20px',
+              border: 'none',
+              background: 'transparent',
+              color: '#25D366',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              if (selectedDuration === 'custom') {
+                onPin('custom', calculateMinutes());
+              } else {
+                onPin(selectedDuration);
+              }
+            }}
+            style={{
+              padding: '10px 24px',
+              borderRadius: '20px',
+              border: 'none',
+              background: '#25D366',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Pin
+          </button>
         </div>
       </div>
     </div>

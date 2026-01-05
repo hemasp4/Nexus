@@ -2736,6 +2736,7 @@ body.font-large .contact-last-message {
     transition: opacity 0.3s ease;
     z-index: -1;
     filter: blur(8px);
+    
 }
 
 .arise-btn:hover {

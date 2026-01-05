@@ -26,6 +26,7 @@ from routes.settings import router as settings_router, block_router
 from routes.archive import router as archive_router
 from routes.calls import router as calls_router
 from routes.status import router as status_router
+from routes.chat_actions import router as chat_actions_router
 
 # Get absolute path to frontend directory
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
@@ -51,7 +52,12 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,6 +75,7 @@ app.include_router(block_router)
 app.include_router(archive_router)
 app.include_router(calls_router)
 app.include_router(status_router)
+app.include_router(chat_actions_router)
 
 # Get absolute path to frontend directory - more robust
 import pathlib
@@ -172,6 +179,66 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, token: str = No
                 # Handle room leave
                 room_id = message_data.get("room_id")
                 manager.leave_room(room_id, user_id)
+            
+            # Group Call Handlers
+            elif msg_type == "group_call_start":
+                room_id = message_data.get("room_id")
+                call_type = message_data.get("call_type", "video")
+                call_id = message_data.get("call_id")
+                await manager.start_group_call(room_id, user_id, username, call_type, call_id)
+                # Send confirmation to initiator
+                await websocket.send_json({
+                    "type": "group_call_started",
+                    "room_id": room_id,
+                    "call_id": call_id
+                })
+            
+            elif msg_type == "group_call_join":
+                room_id = message_data.get("room_id")
+                call = await manager.join_group_call(room_id, user_id, username)
+                if call:
+                    # Send call info to joiner
+                    await websocket.send_json({
+                        "type": "group_call_joined",
+                        "room_id": room_id,
+                        "call_id": call["call_id"],
+                        "participants": list(call["participants"])
+                    })
+            
+            elif msg_type == "group_call_leave":
+                room_id = message_data.get("room_id")
+                await manager.leave_group_call(room_id, user_id)
+            
+            elif msg_type == "group_call_offer":
+                # Relay offer to specific participant
+                to_user = message_data.get("to")
+                await manager.send_personal(to_user, {
+                    "type": "group_call_offer",
+                    "from": user_id,
+                    "from_name": username,
+                    "room_id": message_data.get("room_id"),
+                    "sdp": message_data.get("sdp")
+                })
+            
+            elif msg_type == "group_call_answer":
+                # Relay answer to specific participant
+                to_user = message_data.get("to")
+                await manager.send_personal(to_user, {
+                    "type": "group_call_answer",
+                    "from": user_id,
+                    "room_id": message_data.get("room_id"),
+                    "sdp": message_data.get("sdp")
+                })
+            
+            elif msg_type == "group_call_ice":
+                # Relay ICE candidate to specific participant
+                to_user = message_data.get("to")
+                await manager.send_personal(to_user, {
+                    "type": "group_call_ice",
+                    "from": user_id,
+                    "room_id": message_data.get("room_id"),
+                    "candidate": message_data.get("candidate")
+                })
     
     except WebSocketDisconnect:
         await manager.disconnect(websocket, user_id)

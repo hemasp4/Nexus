@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '../../stores/chatStore';
+import { useAuthStore } from '../../stores/authStore';
 import { useCallStore } from '../../stores/callStore';
 import { MessageList } from '../chat/MessageList';
 import { MessageInput } from '../chat/MessageInput';
@@ -9,7 +10,7 @@ import { StatusViewer } from '../status/StatusViewer';
 import { MediaLinksDocsPanel } from './MediaLinksDocsPanel';
 
 export function ChatArea() {
-    const { currentView, currentChatId, currentChatType, contacts, rooms, messages, selectionMode, selectedMessages, clearSelection, deleteSelectedMessages } = useChatStore();
+    const { currentView, currentChatId, currentChatType, contacts, rooms, messages, selectionMode, selectedMessages, clearSelection, deleteSelectedMessages, viewingStarredChat, setViewingStarredChat, starredMessages } = useChatStore();
     const { initiateCall } = useCallStore();
 
     const [showSearch, setShowSearch] = useState(false);
@@ -17,6 +18,7 @@ export function ChatArea() {
     const [searchResultIndex, setSearchResultIndex] = useState(0);
     const [showDropdown, setShowDropdown] = useState(false);
     const [showContactInfo, setShowContactInfo] = useState(false);
+    const [showMediaPanel, setShowMediaPanel] = useState(false);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -89,12 +91,18 @@ export function ChatArea() {
         : null;
 
     const chatName = currentContact?.username || currentRoom?.name || 'Chat';
-    const chatAvatar = currentContact?.avatar;
     const isOnline = currentContact?.status === 'online';
     const memberCount = currentRoom?.members?.length || 0;
 
     // Filter messages based on search - exclude deleted messages from search
-    const chatMessages = messages[currentChatId] || [];
+    let chatMessages = messages[currentChatId] || [];
+
+    // When viewing starred chat, filter to only show starred messages
+    if (viewingStarredChat) {
+        const starredIds = new Set(starredMessages.map(m => m.id));
+        chatMessages = chatMessages.filter(m => m.starred || starredIds.has(m.id));
+    }
+
     const filteredMessages = searchQuery
         ? chatMessages.filter(m =>
             m.content?.toLowerCase().includes(searchQuery.toLowerCase()) &&
@@ -103,7 +111,13 @@ export function ChatArea() {
         : chatMessages;
 
     const handleVideoCall = () => {
-        if (currentContact) {
+        if (currentChatType === 'room' && currentRoom) {
+            // Group call for rooms - dispatch event to trigger group call
+            const callId = `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            window.dispatchEvent(new CustomEvent('startGroupCall', {
+                detail: { roomId: currentRoom.id, callType: 'video', callId }
+            }));
+        } else if (currentContact) {
             initiateCall(
                 currentContact.contact_id,
                 currentContact.username,
@@ -114,7 +128,13 @@ export function ChatArea() {
     };
 
     const handleVoiceCall = () => {
-        if (currentContact) {
+        if (currentChatType === 'room' && currentRoom) {
+            // Group call for rooms - dispatch event to trigger group call
+            const callId = `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            window.dispatchEvent(new CustomEvent('startGroupCall', {
+                detail: { roomId: currentRoom.id, callType: 'voice', callId }
+            }));
+        } else if (currentContact) {
             initiateCall(
                 currentContact.contact_id,
                 currentContact.username,
@@ -369,21 +389,21 @@ export function ChatArea() {
                                         </svg>
                                         <span>Contact Info</span>
                                     </button>
-                                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); }}>
+                                    <button className="dropdown-item" onClick={() => { setShowMediaPanel(true); setShowDropdown(false); }}>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
                                         <span>Media</span>
                                     </button>
-                                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); }}>
+                                    <button className="dropdown-item" onClick={() => { setShowMediaPanel(true); setShowDropdown(false); }}>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                                 d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                                         </svg>
                                         <span>Links</span>
                                     </button>
-                                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); }}>
+                                    <button className="dropdown-item" onClick={() => { setShowMediaPanel(true); setShowDropdown(false); }}>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -492,6 +512,7 @@ export function ChatArea() {
                 )}
 
                 {/* Messages Container */}
+                <PinnedMessageBanner chatId={currentChatId} messages={chatMessages} />
                 <MessageList
                     chatId={currentChatId}
                     chatType={currentChatType}
@@ -501,6 +522,14 @@ export function ChatArea() {
 
                 {/* Message Input */}
                 <MessageInput chatId={currentChatId} chatType={currentChatType} />
+
+                {/* Media/Links/Docs Panel */}
+                <MediaLinksDocsPanel
+                    isOpen={showMediaPanel}
+                    onClose={() => setShowMediaPanel(false)}
+                    messages={chatMessages}
+                    contactName={currentContact?.username || currentRoom?.name || 'Chat'}
+                />
             </div>
         </main>
     );
@@ -766,6 +795,106 @@ function MenuItem({ icon, label, subtitle, toggle, danger }: { icon: string; lab
                 <div style={{ width: '40px', height: '22px', borderRadius: '11px', background: 'var(--bg-tertiary)', position: 'relative' }}>
                     <div style={{ position: 'absolute', left: '2px', top: '2px', width: '18px', height: '18px', borderRadius: '50%', background: 'var(--text-muted)' }} />
                 </div>
+            )}
+        </div>
+    );
+}
+
+// Pinned Message Banner Component
+function PinnedMessageBanner({ chatId, messages }: { chatId: string | null; messages: any[] }) {
+    const [pinnedIndex, setPinnedIndex] = useState(0);
+    const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
+    const { user } = useAuthStore();
+
+    useEffect(() => {
+        if (!chatId) { setPinnedMessages([]); return; }
+
+        const checkPinned = () => {
+            const allPinned = JSON.parse(localStorage.getItem('pinnedMessages') || '{}');
+            const now = new Date();
+
+            const chatPinned = Object.entries(allPinned)
+                .filter(([id, data]: [string, any]) => {
+                    if (data.chatId !== chatId) return false;
+                    if (new Date(data.expiresAt) < now) {
+                        delete allPinned[id];
+                        localStorage.setItem('pinnedMessages', JSON.stringify(allPinned));
+                        return false;
+                    }
+                    return true;
+                })
+                .map(([id, data]) => ({ id, ...(data as object), message: messages.find(m => m.id === id) }));
+
+            setPinnedMessages(chatPinned);
+        };
+
+        checkPinned();
+        const interval = setInterval(checkPinned, 30000);
+        return () => clearInterval(interval);
+    }, [chatId, messages]);
+
+    const handleUnpin = (messageId: string) => {
+        const allPinned = JSON.parse(localStorage.getItem('pinnedMessages') || '{}');
+        delete allPinned[messageId];
+        localStorage.setItem('pinnedMessages', JSON.stringify(allPinned));
+        setPinnedMessages(prev => prev.filter(p => p.id !== messageId));
+    };
+
+    const handleGoToMessage = (messageId: string) => {
+        const element = document.getElementById(`message-${messageId}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Apply enhanced highlight with pulse animation
+            element.style.transition = 'all 0.3s ease';
+            element.style.background = 'rgba(99, 102, 241, 0.3)';
+            element.style.boxShadow = '0 0 15px rgba(99, 102, 241, 0.5)';
+            element.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                element.style.background = 'rgba(99, 102, 241, 0.15)';
+                element.style.transform = 'scale(1)';
+            }, 500);
+            setTimeout(() => {
+                element.style.background = '';
+                element.style.boxShadow = '';
+                element.style.transform = '';
+                element.style.transition = '';
+            }, 2500);
+        }
+    };
+
+    if (pinnedMessages.length === 0) return null;
+
+    const current = pinnedMessages[pinnedIndex] || pinnedMessages[0];
+    const canUnpin = current?.pinnedBy === user?.id;
+
+    return (
+        <div style={{
+            display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 16px',
+            background: 'rgba(99, 102, 241, 0.1)', borderBottom: '1px solid rgba(99, 102, 241, 0.2)', cursor: 'pointer'
+        }} onClick={() => handleGoToMessage(current?.id)}>
+            <svg width="20" height="20" fill="none" stroke="#6366f1" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 2v10l3 3v4H9v-4l3-3V2M9 21h6" />
+            </svg>
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '12px', color: '#6366f1', fontWeight: 600 }}>{current?.pinnedByName || 'Someone'} pinned</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {current?.messageContent || 'Pinned message'}
+                </div>
+            </div>
+            {pinnedMessages.length > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); setPinnedIndex(Math.max(0, pinnedIndex - 1)); }}
+                        style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '4px' }}>▲</button>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{pinnedIndex + 1}/{pinnedMessages.length}</span>
+                    <button onClick={(e) => { e.stopPropagation(); setPinnedIndex(Math.min(pinnedMessages.length - 1, pinnedIndex + 1)); }}
+                        style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '4px' }}>▼</button>
+                </div>
+            )}
+            {canUnpin && (
+                <button onClick={(e) => { e.stopPropagation(); handleUnpin(current.id); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    ✕ Unpin
+                </button>
             )}
         </div>
     );

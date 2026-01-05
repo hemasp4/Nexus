@@ -17,6 +17,8 @@ interface UserSettings {
     enter_is_send?: boolean;
     media_auto_download?: 'always' | 'wifi' | 'never';
     notification_groups?: boolean;
+    // Auto-save files setting
+    autoSaveFiles?: boolean;
 }
 
 interface BlockedUser {

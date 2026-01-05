@@ -30,10 +30,10 @@ interface AriseState {
 export const useAriseStore = create<AriseState>((set, get) => ({
     conversations: [],
     currentConversation: null,
-    selectedModel: 'gemini-pro',
+    selectedModel: 'gemini-1.5-flash',
     models: [
-        { id: 'gemini-pro', name: 'Gemini Pro', provider: 'Google' },
-        { id: 'gemini-pro-vision', name: 'Gemini Pro Vision', provider: 'Google' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', provider: 'Google' },
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google' },
     ],
     isLoading: false,
     attachedFiles: [],

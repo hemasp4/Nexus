@@ -7,6 +7,8 @@ import { ChatPage } from './pages/ChatPage';
 import { useWebSocket } from './hooks/useWebSocket';
 import { CallModal } from './components/call/CallModal';
 import { IncomingCallModal } from './components/call/IncomingCallModal';
+import { GroupCallModal } from './components/call/GroupCallModal';
+import { PopOutChatManager } from './components/chat/PopOutChat';
 import './styles/style.css';
 import './styles/animations.css';
 
@@ -53,11 +55,13 @@ function AppContent({ isAuthenticated }: { isAuthenticated: boolean }) {
         />
       </Routes>
 
-      {/* Global Call Modals */}
+      {/* Global Call Modals & Pop-out Chats */}
       {isAuthenticated && (
         <>
           <CallModal />
           <IncomingCallModal />
+          <GroupCallModal sendMessage={sendMessage} />
+          <PopOutChatManager />
         </>
       )}
     </>

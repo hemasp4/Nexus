@@ -23,8 +23,19 @@ export function Sidebar() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [showAddContact, setShowAddContact] = useState(false);
     const [showCreateGroup, setShowCreateGroup] = useState(false);
+    const [archivedChats, setArchivedChats] = useState<any[]>([]);
+
+    const API_URL = 'http://127.0.0.1:8000';
 
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Load archived chats on initial mount to ensure proper filtering
+    useEffect(() => {
+        fetch(`${API_URL}/api/chats/archived`)
+            .then(res => res.json())
+            .then(data => setArchivedChats(data.chats || []))
+            .catch(() => { });
+    }, []);
 
     // Save current chat when switching sections
     useEffect(() => {
@@ -43,6 +54,11 @@ export function Sidebar() {
     useEffect(() => {
         if (currentView === 'chats') {
             loadContacts();
+            // Also load archived chat IDs to filter them
+            fetch(`${API_URL}/api/chats/archived`)
+                .then(res => res.json())
+                .then(data => setArchivedChats(data.chats || []))
+                .catch(() => { });
             const last = lastChatPerSection.chats;
             if (last) {
                 setCurrentChat(last.id, last.type);
@@ -60,8 +76,14 @@ export function Sidebar() {
                 setCurrentChat(last.id, last.type);
                 openConversation(last.id);
             }
+        } else if (currentView === 'archived') {
+            // Load archived chats
+            fetch(`${API_URL}/api/chats/archived`)
+                .then(res => res.json())
+                .then(data => setArchivedChats(data.chats || []))
+                .catch(err => console.error('Failed to load archived chats:', err));
         }
-    }, [currentView, loadContacts, loadRooms, loadConversations, setCurrentChat, openConversation]);
+    }, [currentView, loadContacts, loadRooms, loadConversations, setCurrentChat, openConversation, API_URL]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -212,25 +234,47 @@ export function Sidebar() {
 
                 {/* Contact List */}
                 <div className="contact-list" id="contactList">
-                    {/* Chats View */}
-                    {currentView === 'chats' && contacts.map((contact) => (
-                        <ContactItem
-                            key={contact.id}
-                            contact={contact}
-                            isActive={currentChatId === contact.contact_id}
-                            onClick={() => setCurrentChat(contact.contact_id, 'user')}
-                        />
-                    ))}
+                    {/* Chats View - exclude archived chats */}
+                    {currentView === 'chats' && contacts
+                        .filter(contact => !archivedChats.some(a => a.chat_id === contact.contact_id))
+                        .map((contact) => (
+                            <ContactItem
+                                key={contact.id}
+                                contact={contact}
+                                isActive={currentChatId === contact.contact_id}
+                                onClick={() => setCurrentChat(contact.contact_id, 'user')}
+                                onArchive={() => {
+                                    // Instantly add to archived
+                                    setArchivedChats(prev => [...prev, {
+                                        chat_id: contact.contact_id,
+                                        chat_type: 'user',
+                                        chat_name: contact.username,
+                                        archived_at: new Date().toISOString()
+                                    }]);
+                                }}
+                            />
+                        ))}
 
                     {/* Groups View */}
-                    {currentView === 'groups' && rooms.map((room) => (
-                        <RoomItem
-                            key={room.id}
-                            room={room}
-                            isActive={currentChatId === room.id}
-                            onClick={() => setCurrentChat(room.id, 'room')}
-                        />
-                    ))}
+                    {currentView === 'groups' && rooms
+                        .filter(room => !archivedChats.some(a => a.chat_id === room.id))
+                        .map((room) => (
+                            <RoomItem
+                                key={room.id}
+                                room={room}
+                                isActive={currentChatId === room.id}
+                                onClick={() => setCurrentChat(room.id, 'room')}
+                                onArchive={() => {
+                                    // Instantly add to archived and it will be filtered from groups
+                                    setArchivedChats(prev => [...prev, {
+                                        chat_id: room.id,
+                                        chat_type: 'room',
+                                        chat_name: room.name,
+                                        archived_at: new Date().toISOString()
+                                    }]);
+                                }}
+                            />
+                        ))}
 
                     {/* Arise AI View */}
                     {currentView === 'arise' && (
@@ -266,10 +310,34 @@ export function Sidebar() {
                     {currentView === 'starred' && <StarredMessages />}
 
                     {/* Archived View */}
+                    {/* Archived View - show archived chats with same style as contacts */}
                     {currentView === 'archived' && (
-                        <div className="empty-list-message">
-                            <p>Archived chats will appear here</p>
-                        </div>
+                        <>
+                            {archivedChats.length > 0 ? archivedChats.map((archivedChat: any) => {
+                                // Check if it's a contact or room
+                                const contact = contacts.find(c => c.contact_id === archivedChat.chat_id);
+                                const room = rooms.find(r => r.id === archivedChat.chat_id);
+                                const chatType = archivedChat.chat_type || (room ? 'room' : 'user');
+                                const chatName = contact?.username || room?.name || archivedChat.chat_name || 'Archived Chat';
+                                const avatar = contact?.avatar || room?.avatar;
+
+                                return (
+                                    <ArchivedContactItem
+                                        key={archivedChat.chat_id}
+                                        archivedChat={{ ...archivedChat, chat_name: chatName, chat_type: chatType }}
+                                        contact={contact}
+                                        room={room}
+                                        onClick={() => setCurrentChat(archivedChat.chat_id, chatType as 'user' | 'room')}
+                                        onUnarchive={() => setArchivedChats(prev => prev.filter(c => c.chat_id !== archivedChat.chat_id))}
+                                    />
+                                );
+                            }) : (
+                                <div className="empty-list-message">
+                                    <p>No archived chats</p>
+                                    <p className="sub-text">Archive a chat from the dropdown menu</p>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {/* Empty Chats */}
@@ -304,9 +372,12 @@ export function Sidebar() {
 }
 
 // Contact Item Component
-function ContactItem({ contact, isActive, onClick }: { contact: Contact; isActive?: boolean; onClick: () => void }) {
+function ContactItem({ contact, isActive, onClick, onArchive }: { contact: Contact; isActive?: boolean; onClick: () => void; onArchive?: () => void }) {
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+    const [showHover, setShowHover] = useState(false);
+    const { setCurrentChat } = useChatStore();
+    const API_URL = 'http://127.0.0.1:8000';
 
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -315,7 +386,53 @@ function ContactItem({ contact, isActive, onClick }: { contact: Contact; isActiv
         setShowContextMenu(true);
     };
 
+    const handleDropdownClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setContextMenuPos({ x: rect.left, y: rect.bottom + 5 });
+        setShowContextMenu(true);
+    };
+
     const handleCloseMenu = () => setShowContextMenu(false);
+
+    // API Actions
+    const handleChatAction = async (action: string) => {
+        try {
+            await fetch(`${API_URL}/api/chats/${contact.contact_id}/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, chat_type: 'user', chat_name: contact.username })
+            });
+            handleCloseMenu();
+            // Instant removal on archive
+            if (action === 'archive' && onArchive) {
+                onArchive();
+            }
+        } catch (error) {
+            console.error('Chat action failed:', error);
+        }
+    };
+
+    const handlePopOut = () => {
+        // Store chat data for pop-out window
+        const popOutData = {
+            chatId: contact.contact_id,
+            chatType: 'user',
+            chatName: contact.username,
+            avatar: contact.avatar
+        };
+        localStorage.setItem('popOutChat', JSON.stringify(popOutData));
+
+        // Dispatch event to open pop-out
+        window.dispatchEvent(new CustomEvent('openPopOutChat', { detail: popOutData }));
+        handleCloseMenu();
+    };
+
+    const handleCloseChat = () => {
+        setCurrentChat(null, null);
+        handleCloseMenu();
+    };
 
     // Close on click outside
     useEffect(() => {
@@ -332,6 +449,9 @@ function ContactItem({ contact, isActive, onClick }: { contact: Contact; isActiv
                 className={`contact-item ${isActive ? 'active' : ''}`}
                 onClick={onClick}
                 onContextMenu={handleContextMenu}
+                onMouseEnter={() => setShowHover(true)}
+                onMouseLeave={() => setShowHover(false)}
+                style={{ position: 'relative' }}
             >
                 <div className="contact-avatar">
                     {contact.avatar ? (
@@ -339,7 +459,6 @@ function ContactItem({ contact, isActive, onClick }: { contact: Contact; isActiv
                             src={contact.avatar.startsWith('http') ? contact.avatar : `http://127.0.0.1:8000/api/files/${contact.avatar}`}
                             alt={contact.username}
                             onError={(e) => {
-                                // If image fails to load, hide it and show placeholder
                                 e.currentTarget.style.display = 'none';
                             }}
                         />
@@ -361,9 +480,33 @@ function ContactItem({ contact, isActive, onClick }: { contact: Contact; isActiv
                         <span className="unread-badge">{contact.unread_count}</span>
                     </div>
                 )}
+                {/* Dropdown Icon - shows on hover */}
+                {showHover && (
+                    <button
+                        onClick={handleDropdownClick}
+                        style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'rgba(0,0,0,0.3)',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '4px 6px',
+                            cursor: 'pointer',
+                            color: '#aaa',
+                            display: 'flex',
+                            alignItems: 'center'
+                        }}
+                    >
+                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M7 10l5 5 5-5z" />
+                        </svg>
+                    </button>
+                )}
             </div>
 
-            {/* Right-click Context Menu - WhatsApp Style */}
+            {/* Context Menu - WhatsApp Style */}
             {showContextMenu && (
                 <div
                     style={{
@@ -383,39 +526,39 @@ function ContactItem({ contact, isActive, onClick }: { contact: Contact; isActiv
                     <ContextMenuItem
                         icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" /></svg>}
                         label="Mark as unread"
-                        onClick={handleCloseMenu}
+                        onClick={() => handleChatAction('mark_unread')}
                     />
                     <ContextMenuItem
                         icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 2v6M12 8l3-3M12 8l-3-3M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" /></svg>}
                         label="Pin to top"
-                        onClick={handleCloseMenu}
+                        onClick={() => handleChatAction('pin_to_top')}
                     />
                     <ContextMenuItem
                         icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1z" /><path d="M10 12h4" /></svg>}
                         label="Archive"
-                        onClick={handleCloseMenu}
+                        onClick={() => handleChatAction('archive')}
                     />
                     <ContextMenuItem
                         icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" /></svg>}
                         label="Clear messages"
-                        onClick={handleCloseMenu}
+                        onClick={() => { if (confirm('Clear all messages? This cannot be undone.')) handleChatAction('clear_messages'); }}
                     />
                     <ContextMenuItem
                         icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>}
                         label="Delete"
                         danger
-                        onClick={handleCloseMenu}
+                        onClick={() => { if (confirm('Delete this chat permanently? This cannot be undone.')) handleChatAction('delete_chat'); }}
                     />
                     <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
                     <ContextMenuItem
                         icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3M18 3h3v3M10 14L21 3" /></svg>}
                         label="Pop-out chat"
-                        onClick={handleCloseMenu}
+                        onClick={handlePopOut}
                     />
                     <ContextMenuItem
                         icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" /></svg>}
                         label="Close chat"
-                        onClick={handleCloseMenu}
+                        onClick={handleCloseChat}
                     />
                 </div>
             )}
@@ -458,20 +601,227 @@ function ContextMenuItem({ icon, label, danger, onClick }: { icon: React.ReactNo
     );
 }
 
-// Room Item Component
-function RoomItem({ room, isActive, onClick }: { room: Room; isActive?: boolean; onClick: () => void }) {
+// Archived Contact Item Component with Dropdown
+function ArchivedContactItem({ archivedChat, contact, room, onClick, onUnarchive }: { archivedChat: any; contact?: Contact; room?: Room; onClick: () => void; onUnarchive: () => void }) {
+    const [showContextMenu, setShowContextMenu] = useState(false);
+    const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+    const [showHover, setShowHover] = useState(false);
+    const { setCurrentChat } = useChatStore();
+    const API_URL = 'http://127.0.0.1:8000';
+
+    // Determine display values based on contact or room
+    const chatName = archivedChat.chat_name || contact?.username || room?.name || 'Archived Chat';
+    const avatar = contact?.avatar || room?.avatar;
+    const chatType = archivedChat.chat_type || (room ? 'room' : 'user');
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+        setShowContextMenu(true);
+    };
+
+    const handleDropdownClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setContextMenuPos({ x: rect.left, y: rect.bottom + 5 });
+        setShowContextMenu(true);
+    };
+
+    const handleCloseMenu = () => setShowContextMenu(false);
+
+    const handleChatAction = async (action: string) => {
+        try {
+            await fetch(`${API_URL}/api/chats/${archivedChat.chat_id}/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, chat_type: chatType })
+            });
+            handleCloseMenu();
+            if (action === 'unarchive') onUnarchive();
+        } catch (error) { console.error('Action failed:', error); }
+    };
+
+    const handlePopOut = () => {
+        const popOutData = { chatId: archivedChat.chat_id, chatType, chatName, avatar };
+        localStorage.setItem('popOutChat', JSON.stringify(popOutData));
+        window.dispatchEvent(new CustomEvent('openPopOutChat', { detail: popOutData }));
+        handleCloseMenu();
+    };
+
+    useEffect(() => {
+        const handleClick = () => handleCloseMenu();
+        if (showContextMenu) window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, [showContextMenu]);
+
     return (
-        <div className={`contact-item ${isActive ? 'active' : ''}`} onClick={onClick}>
-            <div className="contact-avatar">
-                <div className="avatar-placeholder group-avatar">
-                    {room.name?.charAt(0)?.toUpperCase() || 'G'}
+        <>
+            <div
+                className="contact-item"
+                onClick={onClick}
+                onContextMenu={handleContextMenu}
+                onMouseEnter={() => setShowHover(true)}
+                onMouseLeave={() => setShowHover(false)}
+                style={{ display: 'flex', alignItems: 'center', position: 'relative' }}
+            >
+                <div className="contact-avatar" style={{ position: 'relative' }}>
+                    {avatar ? (
+                        <img src={avatar.startsWith('http') ? avatar : `${API_URL}/api/files/${avatar}`}
+                            alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    ) : (
+                        <div className="avatar-placeholder">
+                            {chatName.charAt(0).toUpperCase()}
+                        </div>
+                    )}
+                    {chatType === 'room' && (
+                        <div style={{
+                            position: 'absolute', bottom: -2, right: -2,
+                            width: '14px', height: '14px', borderRadius: '50%',
+                            background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                            <svg width="8" height="8" fill="#fff" viewBox="0 0 24 24">
+                                <path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                            </svg>
+                        </div>
+                    )}
                 </div>
+                <div className="contact-info">
+                    <span className="contact-name">{chatName}</span>
+                    <span className="contact-last-message" style={{ color: '#888', fontSize: '11px' }}>
+                        {chatType === 'room' ? 'Group • ' : ''}Archived {archivedChat.archived_at ? new Date(archivedChat.archived_at).toLocaleDateString() : ''}
+                    </span>
+                </div>
+                {showHover && (
+                    <button onClick={handleDropdownClick} style={{
+                        position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                        background: 'rgba(0,0,0,0.3)', border: 'none', borderRadius: '4px',
+                        padding: '4px 6px', cursor: 'pointer', color: '#aaa', display: 'flex', alignItems: 'center'
+                    }}>
+                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
+                    </button>
+                )}
             </div>
-            <div className="contact-info">
-                <span className="contact-name">{room.name}</span>
-                <span className="contact-last-message">{room.members?.length || 0} members</span>
+            {showContextMenu && (
+                <div style={{
+                    position: 'fixed', top: contextMenuPos.y, left: contextMenuPos.x,
+                    background: '#233138', borderRadius: '3px', boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+                    zIndex: 10000, minWidth: '200px', overflow: 'hidden', animation: 'fadeIn 0.1s ease'
+                }} onClick={(e) => e.stopPropagation()}>
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1z" /><path d="M10 12h4" /></svg>} label="Unarchive" onClick={() => handleChatAction('unarchive')} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" /></svg>} label="Mark as unread" onClick={() => handleChatAction('mark_unread')} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" /></svg>} label="Clear messages" onClick={() => { if (confirm('Clear all messages?')) handleChatAction('clear_messages'); }} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>} label="Delete" danger onClick={() => { if (confirm('Delete this chat?')) handleChatAction('delete_chat'); }} />
+                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3M18 3h3v3M10 14L21 3" /></svg>} label="Pop-out chat" onClick={handlePopOut} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" /></svg>} label="Close chat" onClick={() => { setCurrentChat(null, null); handleCloseMenu(); }} />
+                </div>
+            )}
+        </>
+    );
+}
+
+
+// Room Item Component with Dropdown
+function RoomItem({ room, isActive, onClick, onArchive }: { room: Room; isActive?: boolean; onClick: () => void; onArchive?: () => void }) {
+    const [showContextMenu, setShowContextMenu] = useState(false);
+    const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+    const [showHover, setShowHover] = useState(false);
+    const { setCurrentChat } = useChatStore();
+    const API_URL = 'http://127.0.0.1:8000';
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+        setShowContextMenu(true);
+    };
+
+    const handleDropdownClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setContextMenuPos({ x: rect.left, y: rect.bottom + 5 });
+        setShowContextMenu(true);
+    };
+
+    const handleCloseMenu = () => setShowContextMenu(false);
+
+    const handleChatAction = async (action: string) => {
+        try {
+            await fetch(`${API_URL}/api/chats/${room.id}/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, chat_type: 'room', chat_name: room.name })
+            });
+            handleCloseMenu();
+            // Instant removal from groups list when archiving
+            if (action === 'archive' && onArchive) {
+                onArchive();
+            }
+        } catch (error) { console.error('Action failed:', error); }
+    };
+
+    const handlePopOut = () => {
+        const popOutData = { chatId: room.id, chatType: 'room', chatName: room.name, avatar: undefined };
+        localStorage.setItem('popOutChat', JSON.stringify(popOutData));
+        window.dispatchEvent(new CustomEvent('openPopOutChat', { detail: popOutData }));
+        handleCloseMenu();
+    };
+
+    useEffect(() => {
+        const handleClick = () => handleCloseMenu();
+        if (showContextMenu) window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, [showContextMenu]);
+
+    return (
+        <>
+            <div
+                className={`contact-item ${isActive ? 'active' : ''}`}
+                onClick={onClick}
+                onContextMenu={handleContextMenu}
+                onMouseEnter={() => setShowHover(true)}
+                onMouseLeave={() => setShowHover(false)}
+                style={{ position: 'relative' }}
+            >
+                <div className="contact-avatar">
+                    <div className="avatar-placeholder group-avatar">
+                        {room.name?.charAt(0)?.toUpperCase() || 'G'}
+                    </div>
+                </div>
+                <div className="contact-info">
+                    <span className="contact-name">{room.name}</span>
+                    <span className="contact-last-message">{room.members?.length || 0} members</span>
+                </div>
+                {showHover && (
+                    <button onClick={handleDropdownClick} style={{
+                        position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                        background: 'rgba(0,0,0,0.3)', border: 'none', borderRadius: '4px',
+                        padding: '4px 6px', cursor: 'pointer', color: '#aaa', display: 'flex', alignItems: 'center'
+                    }}>
+                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
+                    </button>
+                )}
             </div>
-        </div>
+            {showContextMenu && (
+                <div style={{
+                    position: 'fixed', top: contextMenuPos.y, left: contextMenuPos.x,
+                    background: '#233138', borderRadius: '3px', boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+                    zIndex: 10000, minWidth: '200px', overflow: 'hidden', animation: 'fadeIn 0.1s ease'
+                }} onClick={(e) => e.stopPropagation()}>
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" /></svg>} label="Mark as unread" onClick={() => handleChatAction('mark_unread')} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 2v6M12 8l3-3M12 8l-3-3M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" /></svg>} label="Pin to top" onClick={() => handleChatAction('pin_to_top')} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1z" /><path d="M10 12h4" /></svg>} label="Archive" onClick={() => handleChatAction('archive')} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" /></svg>} label="Clear messages" onClick={() => { if (confirm('Clear all messages?')) handleChatAction('clear_messages'); }} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>} label="Delete" danger onClick={() => { if (confirm('Delete this group?')) handleChatAction('delete_chat'); }} />
+                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3M18 3h3v3M10 14L21 3" /></svg>} label="Pop-out chat" onClick={handlePopOut} />
+                    <ContextMenuItem icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" /></svg>} label="Close chat" onClick={() => { setCurrentChat(null, null); handleCloseMenu(); }} />
+                </div>
+            )}
+        </>
     );
 }
 

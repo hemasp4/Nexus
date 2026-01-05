@@ -278,6 +278,38 @@ export function MediaLinksDocsPanel({
                                 </svg>
                             </button>
                         )}
+                        {/* Voice search button */}
+                        <button
+                            onClick={() => {
+                                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                                    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                                    const recognition = new SpeechRecognition();
+                                    recognition.continuous = false;
+                                    recognition.interimResults = false;
+                                    recognition.lang = 'en-US';
+                                    recognition.onresult = (event: any) => {
+                                        const transcript = event.results[0][0].transcript;
+                                        setSearchQuery(transcript);
+                                    };
+                                    recognition.start();
+                                } else {
+                                    alert('Voice search not supported in this browser');
+                                }
+                            }}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'rgba(255,255,255,0.5)',
+                                cursor: 'pointer',
+                                padding: '4px'
+                            }}
+                            title="Voice search"
+                        >
+                            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+                            </svg>
+                        </button>
                         {/* Filter toggle button */}
                         <button
                             onClick={() => setShowFilters(!showFilters)}
@@ -417,7 +449,7 @@ export function MediaLinksDocsPanel({
                                 }}
                                 title="Forward"
                             >
-                                <img src="/src/assets/icons/share.png" alt="Forward" style={{ width: '16px', height: '16px' }} />
+                                <img src="/src/assets/icons/forward.png" alt="Forward" style={{ width: '16px', height: '16px' }} />
                             </button>
                             {/* Share */}
                             <button

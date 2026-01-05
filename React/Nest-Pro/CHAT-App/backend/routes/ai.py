@@ -6,7 +6,7 @@ from config import settings
 from utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/arise", tags=["Arise AI"])
-
+gemini_model = 'gemini-2.5-flash' 
 # Configure Gemini
 if settings.GEMINI_API_KEY:
     genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -48,7 +48,7 @@ async def chat_with_arise(
     
     try:
         # Build conversation
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel(gemini_model)
         
         # Build chat history
         history = []
@@ -99,7 +99,7 @@ Format your response with clear sections using markdown."""
         )
     
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel(gemini_model)
         
         prompt = f"{ARISE_SYSTEM_PROMPT}\n\n{collaboration_prompt}\n\nTopic: {message.content}"
         if message.context:
@@ -128,7 +128,7 @@ from datetime import datetime
 
 class ConversationCreate(BaseModel):
     title: Optional[str] = "New Chat"
-    model: Optional[str] = "gemini-pro"
+    model: Optional[str] = gemini_model
 
 class ConversationUpdate(BaseModel):
     title: Optional[str] = None
@@ -143,15 +143,23 @@ async def get_conversations(current_user: dict = Depends(get_current_user)):
     """Get all AI conversations for the current user"""
     try:
         conversations = await get_db().ai_conversations.find(
-            {"user_id": current_user["id"]},
+            {"user_id": current_user["user_id"]},
             {"messages": 0}  # Exclude messages for listing
         ).sort("updated_at", -1).to_list(100)
         
+        result = []
         for conv in conversations:
-            conv["id"] = str(conv.pop("_id"))
+            result.append({
+                "id": str(conv["_id"]),
+                "title": conv.get("title", "New Chat"),
+                "model": conv.get("model", gemini_model),
+                "created_at": conv.get("created_at").isoformat() if conv.get("created_at") else None,
+                "updated_at": conv.get("updated_at").isoformat() if conv.get("updated_at") else None
+            })
         
-        return conversations
+        return result
     except Exception as e:
+        print(f"Error getting conversations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/conversations")
@@ -161,21 +169,29 @@ async def create_conversation(
 ):
     """Create a new AI conversation"""
     try:
+        now = datetime.utcnow()
         conversation = {
-            "user_id": current_user["id"],
+            "user_id": current_user["user_id"],
             "title": data.title,
             "model": data.model,
             "messages": [],
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": now,
+            "updated_at": now
         }
         
         result = await get_db().ai_conversations.insert_one(conversation)
-        conversation["id"] = str(result.inserted_id)
-        del conversation["_id"]
         
-        return conversation
+        # Return a clean response
+        return {
+            "id": str(result.inserted_id),
+            "title": data.title,
+            "model": data.model,
+            "messages": [],
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        }
     except Exception as e:
+        print(f"Error creating conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/conversations/{conv_id}")
@@ -187,15 +203,22 @@ async def get_conversation(
     try:
         conversation = await get_db().ai_conversations.find_one({
             "_id": ObjectId(conv_id),
-            "user_id": current_user["id"]
+            "user_id": current_user["user_id"]
         })
         
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
         
-        conversation["id"] = str(conversation.pop("_id"))
-        return conversation
+        return {
+            "id": str(conversation["_id"]),
+            "title": conversation.get("title", "New Chat"),
+            "model": conversation.get("model", gemini_model),
+            "messages": conversation.get("messages", []),
+            "created_at": conversation.get("created_at").isoformat() if conversation.get("created_at") else None,
+            "updated_at": conversation.get("updated_at").isoformat() if conversation.get("updated_at") else None
+        }
     except Exception as e:
+        print(f"Error getting conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/conversations/{conv_id}")
@@ -213,7 +236,7 @@ async def update_conversation(
             update_data["messages"] = data.messages
         
         result = await get_db().ai_conversations.update_one(
-            {"_id": ObjectId(conv_id), "user_id": current_user["id"]},
+            {"_id": ObjectId(conv_id), "user_id": current_user["user_id"]},
             {"$set": update_data}
         )
         
@@ -233,7 +256,7 @@ async def delete_conversation(
     try:
         result = await get_db().ai_conversations.delete_one({
             "_id": ObjectId(conv_id),
-            "user_id": current_user["id"]
+            "user_id": current_user["user_id"]
         })
         
         if result.deleted_count == 0:
@@ -258,7 +281,7 @@ async def add_message(
         }
         
         result = await get_db().ai_conversations.update_one(
-            {"_id": ObjectId(conv_id), "user_id": current_user["id"]},
+            {"_id": ObjectId(conv_id), "user_id": current_user["user_id"]},
             {
                 "$push": {"messages": message},
                 "$set": {"updated_at": datetime.utcnow()}
@@ -283,7 +306,7 @@ async def chat_in_conversation(
         # Get conversation
         conversation = await get_db().ai_conversations.find_one({
             "_id": ObjectId(conv_id),
-            "user_id": current_user["id"]
+            "user_id": current_user["user_id"]
         })
         
         if not conversation:
@@ -301,7 +324,7 @@ async def chat_in_conversation(
         
         if settings.GEMINI_API_KEY:
             try:
-                model = genai.GenerativeModel(conversation.get("model", "gemini-pro"))
+                model = genai.GenerativeModel(conversation.get("model", gemini_model))
                 history = []
                 for msg in conversation.get("messages", [])[-10:]:
                     role = "user" if msg.get("role") == "user" else "model"

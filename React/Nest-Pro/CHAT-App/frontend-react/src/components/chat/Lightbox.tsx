@@ -126,7 +126,7 @@ export function Lightbox({ isOpen, onClose, fileId, fileName, fileType, onReply,
     };
 
     const handleTimeUpdate = () => {
-        if (!videoRef.current) return;
+        if (!videoRef.current) return;forward
         setCurrentTime(videoRef.current.currentTime);
         setProgress((videoRef.current.currentTime / videoRef.current.duration) * 100);
     };
